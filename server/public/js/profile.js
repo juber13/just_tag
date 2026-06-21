@@ -7,6 +7,7 @@ const ICON_DEFS = {
   gmail: { file: 'gmail.svg', logo: true },
   maps: { file: 'maps.svg', logo: true },
   message: { file: 'message.svg', tile: '#34C759' },
+  messages: { file: 'message.svg', tile: '#34C759' },
   telegram: { file: 'telegram.svg', tile: '#0088cc' },
   instagram: { file: 'instagram.svg', logo: true },
   link: { file: 'link.svg', logo: true },
@@ -17,7 +18,33 @@ const ICON_DEFS = {
   googlepay: { file: 'googlepay.svg', logo: true },
   paytm: { file: 'paytm.svg', logo: true },
   phonepe: { file: 'phonepe.svg', logo: true },
+  behance: { file: 'behance.svg', logo: true },
+  facebook: { file: 'facebook.svg', logo: true },
+  linkedin: { file: 'linkedin.svg', logo: true },
+  discord: { file: 'discord.svg', tile: '#5865F2' },
+  messenger: { file: 'messenger.svg', tile: '#0084FF' },
+  twitch: { file: 'twitch.svg', tile: '#9146FF' },
+  dribbble: { file: 'dribbble.svg', logo: true },
+  soundcloud: { file: 'soundcloud.svg', tile: '#FF5500' },
+  spotify: { file: 'spotify.svg', tile: '#1DB954' },
+  'play-store': { file: 'play-store.svg', logo: true },
+  document: { file: 'document.svg', logo: true },
+  video: { file: 'video.svg', logo: true },
+  'contact-card': { file: 'contact-card.svg', tile: '#9E9E9E' },
+  'apple-music': { file: 'music.svg', tile: '#FC3C44' },
+  clubhouse: { letter: 'C', tile: '#F5EFE6', darkText: true },
+  appstore: { letter: 'A', tile: '#0D96F6' },
+  calendly: { letter: 'C', tile: '#FFFFFF', darkText: true },
+  'google-meet': { letter: 'M', tile: '#FFFFFF', darkText: true },
+  linktree: { letter: 'L', tile: '#43E55E' },
+  fiverr: { letter: 'fi', tile: '#1DBF73' },
 };
+
+function externalHref(value) {
+  const v = value.trim();
+  if (/^https?:\/\//i.test(v)) return v;
+  return `https://${v}`;
+}
 
 const LINK_META = {
   whatsapp: {
@@ -48,7 +75,7 @@ const LINK_META = {
   messages: {
     label: 'Message',
     href: (v) => `sms:${v}`,
-    icon: 'message',
+    icon: 'messages',
   },
   telegram: {
     label: 'Telegram',
@@ -62,12 +89,12 @@ const LINK_META = {
   },
   'google-reviews': {
     label: 'Google Reviews',
-    href: (v) => v,
+    href: (v) => externalHref(v),
     icon: 'google-reviews',
   },
   catalog: {
     label: 'Catalog',
-    href: (v) => v,
+    href: (v) => externalHref(v),
     icon: 'catalog',
   },
   facetime: {
@@ -79,6 +106,111 @@ const LINK_META = {
     label: 'Twitter X',
     href: (v) => (v.startsWith('http') ? v : `https://x.com/${v.replace('@', '')}`),
     icon: 'twitter',
+  },
+  clubhouse: {
+    label: 'Clubhouse',
+    href: (v) => externalHref(v),
+    icon: 'clubhouse',
+  },
+  discord: {
+    label: 'Discord',
+    href: (v) => externalHref(v),
+    icon: 'discord',
+  },
+  facebook: {
+    label: 'Facebook',
+    href: (v) => externalHref(v),
+    icon: 'facebook',
+  },
+  messenger: {
+    label: 'Messenger',
+    href: (v) => externalHref(v),
+    icon: 'messenger',
+  },
+  twitch: {
+    label: 'Twitch',
+    href: (v) => externalHref(v),
+    icon: 'twitch',
+  },
+  appstore: {
+    label: 'Appstore',
+    href: (v) => externalHref(v),
+    icon: 'appstore',
+  },
+  calendly: {
+    label: 'Calendly',
+    href: (v) => externalHref(v),
+    icon: 'calendly',
+  },
+  'google-meet': {
+    label: 'Google Meet',
+    href: (v) => externalHref(v),
+    icon: 'google-meet',
+  },
+  'play-store': {
+    label: 'Play Store',
+    href: (v) => externalHref(v),
+    icon: 'play-store',
+  },
+  linkedin: {
+    label: 'Linkedin',
+    href: (v) => externalHref(v),
+    icon: 'linkedin',
+  },
+  linktree: {
+    label: 'Linktree',
+    href: (v) => externalHref(v),
+    icon: 'linktree',
+  },
+  behance: {
+    label: 'Behance',
+    href: (v) => externalHref(v),
+    icon: 'behance',
+  },
+  dribbble: {
+    label: 'Dribble',
+    href: (v) => externalHref(v),
+    icon: 'dribbble',
+  },
+  fiverr: {
+    label: 'Fiverr',
+    href: (v) => externalHref(v),
+    icon: 'fiverr',
+  },
+  'apple-music': {
+    label: 'Apple Music',
+    href: (v) => externalHref(v),
+    icon: 'apple-music',
+  },
+  soundcloud: {
+    label: 'Sound Cloud',
+    href: (v) => externalHref(v),
+    icon: 'soundcloud',
+  },
+  spotify: {
+    label: 'Spotify',
+    href: (v) => externalHref(v),
+    icon: 'spotify',
+  },
+  document: {
+    label: 'Document',
+    href: (v) => externalHref(v),
+    icon: 'document',
+  },
+  link: {
+    label: 'Link',
+    href: (v) => externalHref(v),
+    icon: 'link',
+  },
+  video: {
+    label: 'Video',
+    href: (v) => externalHref(v),
+    icon: 'video',
+  },
+  'contact-card': {
+    label: 'Contact Card',
+    href: (v) => externalHref(v),
+    icon: 'contact-card',
   },
   'google-pay': { label: 'Google Pay', icon: 'googlepay', payment: true },
   paytm: { label: 'Paytm', icon: 'paytm', payment: true },
@@ -283,13 +415,32 @@ function createIconElement(iconKey) {
     wrap.style.backgroundColor = def.tile;
   }
 
+  if (def.file) {
+    const img = document.createElement('img');
+    img.src = `/icons/${def.file}`;
+    img.alt = '';
+    img.className = 'link-icon-img';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    wrap.appendChild(img);
+    return wrap;
+  }
+
+  if (def.letter) {
+    wrap.classList.add('link-icon--letter');
+    const letter = document.createElement('span');
+    letter.className = 'link-icon-letter';
+    letter.textContent = def.letter;
+    letter.style.color = def.darkText ? '#111' : '#fff';
+    wrap.appendChild(letter);
+    return wrap;
+  }
+
   const img = document.createElement('img');
-  img.src = `/icons/${def.file}`;
+  img.src = `/icons/${ICON_DEFS.link.file}`;
   img.alt = '';
   img.className = 'link-icon-img';
-  img.loading = 'lazy';
-  img.decoding = 'async';
-
+  wrap.classList.add('link-icon--logo');
   wrap.appendChild(img);
   return wrap;
 }
@@ -329,11 +480,11 @@ function renderLinksGrid(links, payments) {
     if (!link.value?.trim() || PAYMENT_IDS.has(link.id)) continue;
     const meta = LINK_META[link.id] || {
       label: link.label || link.id,
-      href: (v) => (v.startsWith('http') ? v : `https://${v}`),
-      icon: 'link',
+      href: (v) => externalHref(v),
+      icon: link.id in ICON_DEFS ? link.id : 'link',
     };
     tiles.push(
-      createTile(meta.label, meta.icon, null, meta.href(link.value.trim())),
+      createTile(link.label || meta.label, meta.icon, null, meta.href(link.value.trim())),
     );
   }
 
