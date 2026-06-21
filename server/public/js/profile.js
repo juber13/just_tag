@@ -526,6 +526,8 @@ function buildRoleLine(data) {
 
   return left || about || '';
 }
+
+function renderLinksGrid(links, payments) {
   const grid = document.getElementById('links-grid');
   grid.innerHTML = '';
 

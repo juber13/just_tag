@@ -298,8 +298,23 @@ function serverContactToContact(raw: ServerContactPayload): Contact {
 }
 
 export async function resolveProfileSlug(user: StoredUser): Promise<string | null> {
-  if (user.profileSlug?.trim()) return user.profileSlug.trim();
   const email = user.email.trim().toLowerCase();
+  if (email && PROFILE_SYNC_ENABLED) {
+    try {
+      const res = await fetch(
+        `${PROFILE_SERVER_URL}/api/profiles/by-email/${encodeURIComponent(email)}`,
+      );
+      if (res.ok) {
+        const profile = (await res.json()) as PublicProfile;
+        const serverSlug = profile.slug?.trim();
+        if (serverSlug) return serverSlug;
+      }
+    } catch {
+      // fall through to local slug / name lookup
+    }
+  }
+
+  if (user.profileSlug?.trim()) return user.profileSlug.trim();
   if (!email || !PROFILE_SYNC_ENABLED) return null;
   const profile =
     (await fetchPublicProfile(email)) ??
