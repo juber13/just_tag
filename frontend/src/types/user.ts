@@ -13,6 +13,8 @@ export type StoredUser = {
   about?: string;
   coverImageUri?: string;
   avatarImageUri?: string;
+  /** When false, public profile skips the lead capture popup. */
+  leadCaptureEnabled?: boolean;
   authMethod: AuthMethod;
   createdAt: string;
 };
@@ -35,6 +37,7 @@ export function createStoredUser(
     organization: partial.organization ?? '',
     location: partial.location ?? '',
     profileUrl: partial.profileUrl ?? (partial.profileSlug ? defaultProfileUrl(partial.profileSlug) : ''),
+    leadCaptureEnabled: partial.leadCaptureEnabled ?? true,
     authMethod: partial.authMethod ?? 'email',
     createdAt: partial.createdAt ?? new Date().toISOString(),
   };

@@ -8,6 +8,8 @@ type Props = {
   size?: number;
   onPress?: () => void;
   showLabel?: boolean;
+  layout?: 'grid' | 'inline';
+  saved?: boolean;
 };
 
 export function AppIconTile({
@@ -15,21 +17,25 @@ export function AppIconTile({
   size = layout.iconSize,
   onPress,
   showLabel = true,
+  layout: tileLayout = 'grid',
+  saved = false,
 }: Props) {
   const content = (
     <>
-      <View
-        style={[
-          styles.tile,
-          {
-            width: size,
-            height: size,
-            backgroundColor: item.color,
-            borderWidth: item.color === '#FFFFFF' ? 1 : 0,
-            borderColor: colors.border,
-          },
-        ]}
-      >
+      <View style={styles.tileWrap}>
+        <View
+          style={[
+            styles.tile,
+            {
+              width: size,
+              height: size,
+              borderRadius: size <= 32 ? 10 : 14,
+              backgroundColor: item.color,
+              borderWidth: item.color === '#FFFFFF' ? 1 : 0,
+              borderColor: colors.border,
+            },
+          ]}
+        >
         {item.iconName ? (
           <Ionicons
             name={item.iconName as keyof typeof Ionicons.glyphMap}
@@ -51,6 +57,12 @@ export function AppIconTile({
             {item.letter ?? item.label[0]}
           </Text>
         )}
+        </View>
+        {saved ? (
+          <View style={styles.savedBadge}>
+            <Ionicons name="checkmark" size={10} color={colors.white} />
+          </View>
+        ) : null}
       </View>
       {showLabel ? (
         <Text style={styles.label} numberOfLines={1}>
@@ -62,13 +74,13 @@ export function AppIconTile({
 
   if (onPress) {
     return (
-      <Pressable style={styles.wrap} onPress={onPress}>
+      <Pressable style={[styles.wrap, tileLayout === 'inline' && styles.wrapInline]} onPress={onPress}>
         {content}
       </Pressable>
     );
   }
 
-  return <View style={styles.wrap}>{content}</View>;
+  return <View style={[styles.wrap, tileLayout === 'inline' && styles.wrapInline]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -78,8 +90,28 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.xs,
   },
+  wrapInline: {
+    width: 'auto',
+    marginBottom: 0,
+    paddingHorizontal: 0,
+  },
+  tileWrap: {
+    position: 'relative',
+  },
+  savedBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.toggleGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
   tile: {
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -277,3 +277,7 @@ export function getAppsByCategory(): Record<string, AppLinkItem[]> {
   }
   return map;
 }
+
+export function getAppLinkItem(id: string): AppLinkItem | undefined {
+  return appsLinksCatalog.find((a) => a.id === id);
+}

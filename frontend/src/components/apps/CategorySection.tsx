@@ -7,9 +7,10 @@ type Props = {
   title: string;
   items: AppLinkItem[];
   onItemPress: (item: AppLinkItem) => void;
+  savedIds?: Set<string>;
 };
 
-export function CategorySection({ title, items, onItemPress }: Props) {
+export function CategorySection({ title, items, onItemPress, savedIds }: Props) {
   return (
     <View style={styles.section}>
       <Text style={styles.title}>{title}</Text>
@@ -19,6 +20,7 @@ export function CategorySection({ title, items, onItemPress }: Props) {
             key={item.id}
             item={item}
             onPress={() => onItemPress(item)}
+            saved={savedIds?.has(item.id)}
           />
         ))}
       </View>

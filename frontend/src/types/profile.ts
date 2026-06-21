@@ -4,6 +4,8 @@ export type SavedProfileLink = {
   category: string;
   value: string;
   color: string;
+  /** When false, link is hidden from the public profile. Defaults to true. */
+  enabled?: boolean;
 };
 
 export type ProfilePayment = {

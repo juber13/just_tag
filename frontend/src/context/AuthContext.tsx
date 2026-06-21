@@ -18,8 +18,9 @@ import {
 } from '../services/authStorage';
 import { loginOnServer, registerOnServer } from '../services/authApi';
 import { AUTH_ENABLED, GUEST_USER } from '../config/appConfig';
+import { profilePublicUrl } from '../config/profileServer';
 import { registerAndSyncUser, syncUserProfile } from '../services/profileSync';
-import { loadProfileMedia } from '../services/profileMediaStorage';
+import { clearLegacyProfileMedia } from '../services/profileMediaStorage';
 import { AuthMethod, createStoredUser, StoredUser } from '../types/user';
 import { colors } from '../theme';
 
@@ -53,15 +54,6 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function mergeUserWithProfileMedia(base: StoredUser): Promise<StoredUser> {
-  const media = await loadProfileMedia();
-  return {
-    ...base,
-    ...(media.coverUri ? { coverImageUri: media.coverUri } : {}),
-    ...(media.avatarUri ? { avatarImageUri: media.avatarUri } : {}),
-  };
-}
-
 function serverAuthToStoredUser(
   authUser: Awaited<ReturnType<typeof loginOnServer>>,
 ): StoredUser {
@@ -94,13 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
+        await clearLegacyProfileMedia();
+
         if (!AUTH_ENABLED) {
           const base = guestUser();
           const stored = await getUserByEmail(base.email);
-          const merged = await mergeUserWithProfileMedia(
-            stored ? { ...base, ...stored } : base,
-          );
-          const synced = await registerAndSyncUser(merged);
+          const synced = await registerAndSyncUser(stored ? { ...base, ...stored } : base);
           if (mounted) setUser(synced);
           return;
         }
@@ -108,8 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const stored = await getLoggedInUser();
         if (mounted) {
           if (stored) {
-            const merged = await mergeUserWithProfileMedia(stored);
-            setUser(await registerAndSyncUser(merged));
+            setUser(await registerAndSyncUser(stored));
           } else {
             setUser(null);
           }
@@ -125,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const completeLogin = useCallback(async (nextUser: StoredUser) => {
+    await clearLegacyProfileMedia();
     const synced = await registerAndSyncUser(nextUser);
     await setSession(synced.email);
     setUser(synced);
@@ -171,9 +162,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
+    await clearLegacyProfileMedia();
     if (!AUTH_ENABLED) {
-      const merged = await mergeUserWithProfileMedia(guestUser());
-      setUser(await registerAndSyncUser(merged));
+      setUser(await registerAndSyncUser(guestUser()));
       return;
     }
     await clearSession();

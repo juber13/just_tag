@@ -1,5 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { PROFILE_SERVER_URL, PROFILE_SYNC_ENABLED, profilePublicUrl } from '../config/profileServer';
+import {
+  PROFILE_SERVER_URL,
+  PROFILE_SYNC_ENABLED,
+  profileMediaUrl,
+  profilePublicUrl,
+} from '../config/profileServer';
 import { Contact } from '../types/contact';
 import { PublicProfile, ProfilePayment, SavedProfileLink } from '../types/profile';
 import { StoredUser } from '../types/user';
@@ -34,7 +39,7 @@ function splitLinksAndPayments(links: SavedProfileLink[]): {
   const connect: SavedProfileLink[] = [];
   const payments: ProfilePayment[] = [];
   for (const link of links) {
-    if (!link.value?.trim()) continue;
+    if (!link.value?.trim() || link.enabled === false) continue;
     if (PAYMENT_IDS.has(link.id)) {
       payments.push({ provider: link.id, upiId: link.value.trim() });
     } else {
@@ -62,7 +67,7 @@ export function userToProfilePayload(
     location: user.location,
     avatarUrl: null,
     coverUrl: null,
-    leadCaptureEnabled: true,
+    leadCaptureEnabled: user.leadCaptureEnabled !== false,
     links,
     payments,
   };
@@ -190,6 +195,9 @@ export function applyServerProfileToUser(user: StoredUser, server: PublicProfile
     about: server.about ?? user.about,
     mobile: server.mobile || user.mobile,
     location: server.location || user.location,
+    avatarImageUri: profileMediaUrl(server.avatarUrl),
+    coverImageUri: profileMediaUrl(server.coverUrl),
+    leadCaptureEnabled: server.leadCaptureEnabled !== false,
   };
 }
 

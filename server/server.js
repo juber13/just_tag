@@ -194,13 +194,26 @@ app.put('/api/profiles/:slug', async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const { fullName, jobTitle, organization, about } = req.body ?? {};
+        const body = req.body ?? {};
         const updates = { updatedAt: new Date().toISOString() };
 
-        if (fullName !== undefined) updates.fullName = String(fullName).trim();
-        if (jobTitle !== undefined) updates.jobTitle = String(jobTitle).trim();
-        if (organization !== undefined) updates.organization = String(organization).trim();
-        if (about !== undefined) updates.about = String(about).trim();
+        for (const key of ['fullName', 'jobTitle', 'organization', 'about', 'mobile', 'email', 'location']) {
+            if (body[key] !== undefined) {
+                updates[key] = String(body[key]).trim();
+            }
+        }
+
+        if (body.leadCaptureEnabled !== undefined) {
+            updates.leadCaptureEnabled = body.leadCaptureEnabled !== false;
+        }
+
+        if (Array.isArray(body.links)) {
+            updates.links = body.links;
+        }
+
+        if (Array.isArray(body.payments)) {
+            updates.payments = body.payments;
+        }
 
         await db.collection('profiles').updateOne(
             { slug: profile.slug },
@@ -260,19 +273,27 @@ app.get('/api/profiles/:slug/contacts', async (req, res) => {
 });
 
 app.post('/api/profiles/:slug/contacts', async (req, res) => {
-    const { name, phone } = req.body ?? {};
-    if (!name?.trim() || !phone?.trim()) {
-        return res.status(400).json({ error: 'Name and phone are required' });
+    try {
+        const { name, phone } = req.body ?? {};
+        if (!name?.trim() || !phone?.trim()) {
+            return res.status(400).json({ error: 'Name and phone are required' });
+        }
+
+        const profile = await findProfile(req.params.slug);
+        if (profile?.leadCaptureEnabled === false) {
+            return res.status(403).json({ error: 'Lead capture is disabled for this profile' });
+        }
+
+        await db.collection('contacts').insertOne({
+            slug: profile?.slug ?? req.params.slug,
+            ...req.body,
+            createdAt: new Date().toISOString(),
+        });
+        res.status(201).json({ ok: true });
+    } catch (error) {
+        console.error('Create contact failed:', error);
+        res.status(500).json({ error: 'Failed to save contact' });
     }
-
-    const profile = await findProfile(req.params.slug);
-
-    await db.collection('contacts').insertOne({
-        slug: profile?.slug ?? req.params.slug,
-        ...req.body,
-        createdAt: new Date().toISOString(),
-    });
-    res.status(201).json({ ok: true });
 });
 
 app.get('/p/:slug', (req, res) => {

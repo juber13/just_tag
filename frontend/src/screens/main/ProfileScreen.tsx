@@ -16,23 +16,27 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ProfileSavedLinksList } from '../../components/apps/ProfileSavedLinksList';
 import { MainTabParamList, ProfileStackParamList } from '../../navigation/types';
-import {
-  loadProfileMedia,
-  saveAvatarUri,
-  saveCoverUri,
-} from '../../services/profileMediaStorage';
 import { colors, layout, spacing, typography } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import {
   PROFILE_CONTACTS_SLUG,
   PROFILE_OWNER_EMAIL,
+  profileMediaUrl,
 } from '../../config/profileServer';
 import {
   applyServerProfileToUser,
   fetchPublicProfile,
   updateProfileDetails,
 } from '../../services/profileApi';
+import {
+  getProfileLinks,
+  reorderProfileLinks,
+  setProfileLinkEnabled,
+} from '../../services/profileLinksStorage';
+import { syncUserProfile } from '../../services/profileSync';
+import { SavedProfileLink } from '../../types/profile';
 import {
   pickProfileImage,
   PickTarget,
@@ -58,8 +62,8 @@ export function ProfileScreen({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [fullName, setFullName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
-  const [organization, setOrganization] = useState('');
   const [about, setAbout] = useState('');
+  const [savedLinks, setSavedLinks] = useState<SavedProfileLink[]>([]);
 
   const profileSlug = user?.profileSlug ?? PROFILE_CONTACTS_SLUG;
   const ownerEmail = user?.email?.trim().toLowerCase() || PROFILE_OWNER_EMAIL;
@@ -68,55 +72,58 @@ export function ProfileScreen({ navigation }: Props) {
     (fields: {
       fullName?: string;
       jobTitle?: string;
-      organization?: string;
       about?: string;
     }) => {
       setFullName(fields.fullName ?? '');
       setJobTitle(fields.jobTitle ?? '');
-      setOrganization(fields.organization ?? '');
       setAbout(fields.about ?? '');
     },
     [],
   );
 
+  const loadSavedLinks = useCallback(async () => {
+    if (!user?.email) {
+      setSavedLinks([]);
+      return;
+    }
+    const links = await getProfileLinks(user.email);
+    setSavedLinks(links.filter((l) => l.value.trim()));
+  }, [user?.email]);
+
   useEffect(() => {
     if (!user) return;
     applyProfileFields(user);
+    setLeadOn(user.leadCaptureEnabled !== false);
   }, [user, applyProfileFields]);
 
   const loadProfileFromServer = useCallback(async () => {
     const serverProfile = await fetchPublicProfile(profileSlug);
     if (!serverProfile) return;
     applyProfileFields(serverProfile);
+    setLeadOn(serverProfile.leadCaptureEnabled !== false);
+    setCoverUri(profileMediaUrl(serverProfile.coverUrl) ?? null);
+    setAvatarUri(profileMediaUrl(serverProfile.avatarUrl) ?? null);
   }, [applyProfileFields, profileSlug]);
 
   useFocusEffect(
     useCallback(() => {
       void loadProfileFromServer();
-    }, [loadProfileFromServer]),
+      void loadSavedLinks();
+    }, [loadProfileFromServer, loadSavedLinks]),
   );
 
   useEffect(() => {
-    loadProfileMedia().then(({ coverUri: cover, avatarUri: avatar }) => {
-      if (cover) setCoverUri(cover);
-      if (avatar) setAvatarUri(avatar);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (user?.coverImageUri) setCoverUri(user.coverImageUri);
-    if (user?.avatarImageUri) setAvatarUri(user.avatarImageUri);
-  }, [user?.coverImageUri, user?.avatarImageUri]);
+    setCoverUri(user?.coverImageUri ?? null);
+    setAvatarUri(user?.avatarImageUri ?? null);
+  }, [user?.email, user?.coverImageUri, user?.avatarImageUri]);
 
   const applyImage = useCallback(
     async (target: PickTarget, uri: string) => {
       if (target === 'banner') {
         setCoverUri(uri);
-        await saveCoverUri(uri);
         await updateUser({ coverImageUri: uri });
       } else {
         setAvatarUri(uri);
-        await saveAvatarUri(uri);
         await updateUser({ avatarImageUri: uri });
       }
     },
@@ -142,7 +149,6 @@ export function ProfileScreen({ navigation }: Props) {
 
   const openPicker = (target: PickTarget) => {
     if (picking) return;
-
     showImageSourceSheet(
       target === 'banner' ? 'Edit cover photo' : 'Edit profile photo',
       (source) => {
@@ -167,7 +173,7 @@ export function ProfileScreen({ navigation }: Props) {
       const serverProfile = await updateProfileDetails(profileSlug, ownerEmail, {
         fullName,
         jobTitle,
-        organization,
+        organization: user?.organization ?? '',
         about,
       });
 
@@ -184,7 +190,7 @@ export function ProfileScreen({ navigation }: Props) {
             ownerEmail: serverProfile.ownerEmail ?? ownerEmail,
             fullName,
             jobTitle,
-            organization,
+            organization: user.organization,
             about,
           }),
         );
@@ -202,6 +208,30 @@ export function ProfileScreen({ navigation }: Props) {
     setIsEditing(false);
   };
 
+  const handleLeadToggle = async (enabled: boolean) => {
+    setLeadOn(enabled);
+    if (!user) return;
+    await updateUser({ leadCaptureEnabled: enabled });
+  };
+
+  const handleLinkToggle = async (link: SavedProfileLink, enabled: boolean) => {
+    if (!user) return;
+    const next = await setProfileLinkEnabled(user.email, link.id, enabled);
+    setSavedLinks(next.filter((l) => l.value.trim()));
+    await syncUserProfile(user);
+  };
+
+  const handleLinkReorder = async (ordered: SavedProfileLink[]) => {
+    if (!user) return;
+    setSavedLinks(ordered);
+    const next = await reorderProfileLinks(
+      user.email,
+      ordered.map((l) => l.id),
+    );
+    setSavedLinks(next.filter((l) => l.value.trim()));
+    void syncUserProfile(user);
+  };
+
   const displayCover = coverUri ?? user?.coverImageUri ?? null;
   const displayAvatar = avatarUri ?? user?.avatarImageUri ?? null;
   const coverOverlayColor = displayCover ? colors.white : colors.black;
@@ -212,11 +242,7 @@ export function ProfileScreen({ navigation }: Props) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={[styles.cover, { height: coverHeight }]} pointerEvents="box-none">
           {displayCover ? (
-            <Image
-              source={{ uri: displayCover }}
-              style={styles.coverImage}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: displayCover }} style={styles.coverImage} resizeMode="cover" />
           ) : null}
           <View
             style={[styles.coverOverlay, { paddingTop: insets.top + spacing.sm }]}
@@ -225,34 +251,20 @@ export function ProfileScreen({ navigation }: Props) {
             <View style={styles.coverTopBar} pointerEvents="box-none">
               <View style={styles.coverSideSlot}>
                 <Pressable style={styles.coverIconBtn} hitSlop={8}>
-                  <Ionicons
-                    name="scan-outline"
-                    size={22}
-                    color={coverOverlayColor}
-                  />
+                  <Ionicons name="scan-outline" size={22} color={coverOverlayColor} />
                 </Pressable>
               </View>
               <View style={styles.coverCenterSlot}>
                 <Pressable
-                  style={[
-                    styles.modePill,
-                    mode === 'Social' && styles.modePillSocial,
-                  ]}
-                  onPress={() =>
-                    setMode((m) => (m === 'Business' ? 'Social' : 'Business'))
-                  }
+                  style={[styles.modePill, mode === 'Social' && styles.modePillSocial]}
+                  onPress={() => setMode((m) => (m === 'Business' ? 'Social' : 'Business'))}
                 >
                   <Ionicons
                     name="person-outline"
                     size={16}
                     color={mode === 'Business' ? colors.white : colors.black}
                   />
-                  <Text
-                    style={[
-                      styles.modeText,
-                      mode === 'Social' && styles.modeTextSocial,
-                    ]}
-                  >
+                  <Text style={[styles.modeText, mode === 'Social' && styles.modeTextSocial]}>
                     {mode}
                   </Text>
                 </Pressable>
@@ -264,11 +276,7 @@ export function ProfileScreen({ navigation }: Props) {
                   accessibilityLabel="Share"
                   hitSlop={8}
                 >
-                  <Ionicons
-                    name="share-outline"
-                    size={24}
-                    color={coverOverlayColor}
-                  />
+                  <Ionicons name="share-outline" size={24} color={coverOverlayColor} />
                 </Pressable>
                 <Pressable
                   style={styles.bannerEdit}
@@ -288,11 +296,7 @@ export function ProfileScreen({ navigation }: Props) {
           <View style={styles.avatarWrap}>
             <View style={styles.avatar}>
               {displayAvatar ? (
-                <Image
-                  source={{ uri: displayAvatar }}
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                />
+                <Image source={{ uri: displayAvatar }} style={styles.avatarImage} resizeMode="cover" />
               ) : (
                 <Ionicons name="person" size={64} color={colors.textSecondary} />
               )}
@@ -313,7 +317,7 @@ export function ProfileScreen({ navigation }: Props) {
               <View style={styles.switchWrap}>
                 <Switch
                   value={leadOn}
-                  onValueChange={setLeadOn}
+                  onValueChange={(enabled) => void handleLeadToggle(enabled)}
                   trackColor={{ false: colors.borderLight, true: colors.toggleGreen }}
                   thumbColor={colors.white}
                 />
@@ -350,14 +354,6 @@ export function ProfileScreen({ navigation }: Props) {
             onChangeText={setJobTitle}
             editable={isEditing}
           />
-          <TextInput
-            style={[styles.field, !isEditing && styles.fieldReadOnly]}
-            placeholder="Company Name"
-            placeholderTextColor={colors.placeholder}
-            value={organization}
-            onChangeText={setOrganization}
-            editable={isEditing}
-          />
           <View style={styles.aboutRow}>
             <TextInput
               style={[styles.field, styles.aboutField, !isEditing && styles.fieldReadOnly]}
@@ -385,9 +381,7 @@ export function ProfileScreen({ navigation }: Props) {
           {saving ? (
             <ActivityIndicator color={colors.white} />
           ) : (
-            <Text style={styles.editBtnText}>
-              {isEditing ? 'Save Details' : 'Edit Details'}
-            </Text>
+            <Text style={styles.editBtnText}>{isEditing ? 'Save Details' : 'Edit Details'}</Text>
           )}
         </Pressable>
         {isEditing ? (
@@ -395,37 +389,35 @@ export function ProfileScreen({ navigation }: Props) {
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </Pressable>
         ) : null}
+
+        <View style={styles.linksSection}>
+          <Text style={styles.linksSectionTitle}>Apps & Links</Text>
+          {savedLinks.length > 0 ? (
+            <ProfileSavedLinksList
+              links={savedLinks}
+              onReorder={(ordered) => void handleLinkReorder(ordered)}
+              onToggle={(link, enabled) => void handleLinkToggle(link, enabled)}
+            />
+          ) : (
+            <Text style={styles.linksEmpty}>
+              Tap + to add apps and links. Long-press the handle to drag and reorder.
+            </Text>
+          )}
+        </View>
       </ScrollView>
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => navigation.navigate('AppsLinksStore')}
-      >
+      <Pressable style={styles.fab} onPress={() => navigation.navigate('AppsLinksStore')}>
         <Ionicons name="add" size={32} color={colors.white} />
       </Pressable>
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  scroll: {
-    paddingBottom: 100,
-  },
-  cover: {
-    backgroundColor: colors.inputBg,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  coverOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
-    elevation: 6,
-  },
+  root: { flex: 1, backgroundColor: colors.white },
+  scroll: { paddingBottom: 100 },
+  cover: { backgroundColor: colors.inputBg, position: 'relative', overflow: 'hidden' },
+  coverOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 10, elevation: 6 },
   coverImage: {
     position: 'absolute',
     top: 0,
@@ -440,25 +432,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: layout.screenPadding,
   },
-  coverSideSlot: {
-    width: 88,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  coverSideSlotRight: {
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-  },
-  coverCenterSlot: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  coverIconBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  coverSideSlot: { width: 88, flexDirection: 'row', alignItems: 'center' },
+  coverSideSlotRight: { justifyContent: 'flex-end', gap: spacing.sm },
+  coverCenterSlot: { flex: 1, alignItems: 'center' },
+  coverIconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   bannerEdit: {
     width: 32,
     height: 32,
@@ -467,14 +444,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  modePillSocial: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modeTextSocial: {
-    color: colors.black,
-  },
+  modePillSocial: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  modeTextSocial: { color: colors.black },
   modePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -484,20 +455,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: layout.pillRadius,
   },
-  modeText: {
-    color: colors.white,
-    fontWeight: '600',
-    fontSize: 14,
-  },
+  modeText: { color: colors.white, fontWeight: '600', fontSize: 14 },
   profileRow: {
     flexDirection: 'row',
     paddingHorizontal: layout.screenPadding,
     alignItems: 'flex-start',
   },
-  avatarWrap: {
-    position: 'relative',
-    marginTop: -50,
-  },
+  avatarWrap: { position: 'relative', marginTop: -50 },
   avatar: {
     width: 110,
     height: 110,
@@ -509,10 +473,7 @@ const styles = StyleSheet.create({
     borderColor: colors.white,
     overflow: 'hidden',
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
+  avatarImage: { width: '100%', height: '100%' },
   avatarEdit: {
     position: 'absolute',
     bottom: 4,
@@ -526,31 +487,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
     elevation: 4,
   },
-  toggles: {
-    flex: 1,
-    marginLeft: spacing.md,
-    marginTop: 16,
-    gap: 6,
-  },
+  toggles: { flex: 1, marginLeft: spacing.md, marginTop: 16, gap: 6 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 28,
   },
-  toggleLabel: {
-    ...typography.bodyBold,
-    fontSize: 15,
-    color: colors.black,
-  },
-  switchWrap: {
-    transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }],
-  },
-  fields: {
-    paddingHorizontal: layout.screenPadding,
-    marginTop: spacing.lg,
-    gap: spacing.md,
-  },
+  toggleLabel: { ...typography.bodyBold, fontSize: 15, color: colors.black },
+  switchWrap: { transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }] },
+  fields: { paddingHorizontal: layout.screenPadding, marginTop: spacing.lg, gap: spacing.md },
   field: {
     backgroundColor: colors.inputBg,
     borderRadius: layout.pillRadius,
@@ -560,20 +506,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.black,
   },
-  fieldReadOnly: {
-    opacity: 0.85,
-  },
-  aboutRow: {
-    position: 'relative',
-  },
-  aboutField: {
-    paddingRight: 44,
-  },
-  infoIcon: {
-    position: 'absolute',
-    right: spacing.md,
-    top: 15,
-  },
+  fieldReadOnly: { opacity: 0.85 },
+  aboutRow: { position: 'relative' },
+  aboutField: { paddingRight: 44 },
+  infoIcon: { position: 'absolute', right: spacing.md, top: 15 },
   editBtn: {
     marginHorizontal: layout.screenPadding,
     marginTop: spacing.xl,
@@ -583,13 +519,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editBtnDisabled: {
-    opacity: 0.7,
-  },
-  editBtnText: {
-    ...typography.bodyBold,
-    color: colors.white,
-  },
+  editBtnDisabled: { opacity: 0.7 },
+  editBtnText: { ...typography.bodyBold, color: colors.white },
   cancelBtn: {
     marginHorizontal: layout.screenPadding,
     marginTop: spacing.md,
@@ -597,9 +528,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelBtnText: {
+  cancelBtnText: { ...typography.bodyBold, color: colors.textSecondary },
+  linksSection: { paddingHorizontal: layout.screenPadding, marginTop: spacing.lg },
+  linksSectionTitle: {
     ...typography.bodyBold,
+    fontSize: 15,
+    color: colors.black,
+    marginBottom: spacing.sm,
+  },
+  linksEmpty: {
+    ...typography.caption,
     color: colors.textSecondary,
+    lineHeight: 20,
   },
   fab: {
     position: 'absolute',
