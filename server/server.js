@@ -37,12 +37,20 @@ async function findProfile(key) {
     });
 }
 
-function isProfileOwner(profile, ownerEmail) {
+async function isProfileOwner(profile, ownerEmail) {
     if (!ownerEmail) return true;
+
+    const normalized = ownerEmail.trim().toLowerCase();
     const allowed = [profile.ownerEmail, profile.email]
         .map((value) => value?.trim().toLowerCase())
         .filter(Boolean);
-    return allowed.length === 0 || allowed.includes(ownerEmail.trim().toLowerCase());
+
+    if (allowed.includes(normalized)) return true;
+
+    const user = await db.collection('users').findOne({ email: normalized });
+    if (user?.profileSlug && user.profileSlug === profile.slug) return true;
+
+    return allowed.length === 0;
 }
 
 app.use(express.json());
@@ -190,7 +198,7 @@ app.put('/api/profiles/:slug', async (req, res) => {
         }
 
         const ownerEmail = req.headers['x-owner-email']?.trim().toLowerCase();
-        if (!isProfileOwner(profile, ownerEmail)) {
+        if (!(await isProfileOwner(profile, ownerEmail))) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -236,7 +244,7 @@ app.patch('/api/profiles/:slug/lead-capture', async (req, res) => {
         }
 
         const ownerEmail = req.headers['x-owner-email']?.trim().toLowerCase();
-        if (!isProfileOwner(profile, ownerEmail)) {
+        if (!(await isProfileOwner(profile, ownerEmail))) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -289,7 +297,7 @@ app.get('/api/profiles/:slug/contacts', async (req, res) => {
         }
 
         const ownerEmail = req.headers['x-owner-email']?.trim().toLowerCase();
-        if (!isProfileOwner(profile, ownerEmail)) {
+        if (!(await isProfileOwner(profile, ownerEmail))) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 

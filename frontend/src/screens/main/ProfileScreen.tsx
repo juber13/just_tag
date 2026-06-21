@@ -28,6 +28,7 @@ import {
 import {
   applyServerProfileToUser,
   fetchPublicProfile,
+  resolveProfileSlug,
   updateLeadCaptureEnabled,
   updateProfileDetails,
 } from '../../services/profileApi';
@@ -51,7 +52,7 @@ const BANNER_HEIGHT = 180;
 export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const tabNav = navigation.getParent<BottomTabNavigationProp<MainTabParamList>>();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, patchUserLocal } = useAuth();
   const [mode, setMode] = useState<'Business' | 'Social'>('Business');
   const [leadOn, setLeadOn] = useState(true);
   const [personalOn, setPersonalOn] = useState(false);
@@ -67,7 +68,12 @@ export function ProfileScreen({ navigation }: Props) {
   const [savedLinks, setSavedLinks] = useState<SavedProfileLink[]>([]);
 
   const profileSlug = user?.profileSlug ?? PROFILE_CONTACTS_SLUG;
-  const ownerEmail = user?.email?.trim().toLowerCase() || PROFILE_OWNER_EMAIL;
+  const ownerEmail = user?.email?.trim().toLowerCase() ?? '';
+
+  const resolveSlugForUser = useCallback(async () => {
+    if (!user) return null;
+    return (await resolveProfileSlug(user)) ?? user.profileSlug?.trim() ?? null;
+  }, [user]);
 
   const applyProfileFields = useCallback(
     (fields: {
@@ -97,13 +103,15 @@ export function ProfileScreen({ navigation }: Props) {
   }, [user, applyProfileFields]);
 
   const loadProfileFromServer = useCallback(async () => {
-    const serverProfile = await fetchPublicProfile(profileSlug);
+    const slug = await resolveSlugForUser();
+    if (!slug) return;
+    const serverProfile = await fetchPublicProfile(slug);
     if (!serverProfile) return;
     applyProfileFields(serverProfile);
     setLeadOn(serverProfile.leadCaptureEnabled !== false);
     setCoverUri(profileMediaUrl(serverProfile.coverUrl) ?? null);
     setAvatarUri(profileMediaUrl(serverProfile.avatarUrl) ?? null);
-  }, [applyProfileFields, profileSlug]);
+  }, [applyProfileFields, resolveSlugForUser]);
 
   useFocusEffect(
     useCallback(() => {
@@ -210,16 +218,27 @@ export function ProfileScreen({ navigation }: Props) {
 
   const handleLeadToggle = async (enabled: boolean) => {
     if (!user) return;
-    const previous = leadOn;
-    setLeadOn(enabled);
-    const saved = await updateLeadCaptureEnabled(profileSlug, ownerEmail, enabled);
-    if (saved === null) {
-      setLeadOn(previous);
-      Alert.alert('Update failed', 'Could not save lead setting. Check server connection.');
+    if (!ownerEmail) {
+      Alert.alert('Sign in required', 'Please sign in to change lead capture settings.');
       return;
     }
-    setLeadOn(saved);
-    await updateUser({ leadCaptureEnabled: saved });
+
+    const slug = await resolveSlugForUser();
+    if (!slug) {
+      Alert.alert('Profile not found', 'Your account is not linked to a public profile on the server.');
+      return;
+    }
+
+    const previous = leadOn;
+    setLeadOn(enabled);
+    const result = await updateLeadCaptureEnabled(slug, ownerEmail, enabled);
+    if (!result.ok) {
+      setLeadOn(previous);
+      Alert.alert('Update failed', result.error);
+      return;
+    }
+    setLeadOn(result.enabled);
+    await patchUserLocal({ leadCaptureEnabled: result.enabled, profileSlug: slug });
   };
 
   const handleLinkToggle = async (link: SavedProfileLink, enabled: boolean) => {

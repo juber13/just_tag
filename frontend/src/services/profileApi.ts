@@ -172,12 +172,21 @@ export async function updateProfileDetails(
   }
 }
 
+export type LeadCaptureUpdateResult =
+  | { ok: true; enabled: boolean }
+  | { ok: false; error: string };
+
 export async function updateLeadCaptureEnabled(
   slug: string,
   ownerEmail: string,
   enabled: boolean,
-): Promise<boolean | null> {
-  if (!PROFILE_SYNC_ENABLED || !slug.trim()) return null;
+): Promise<LeadCaptureUpdateResult> {
+  if (!PROFILE_SYNC_ENABLED || !slug.trim()) {
+    return { ok: false, error: 'Profile sync is disabled or slug is missing' };
+  }
+  if (!ownerEmail.trim()) {
+    return { ok: false, error: 'Owner email is required' };
+  }
   try {
     const res = await fetch(
       `${PROFILE_SERVER_URL}/api/profiles/${encodeURIComponent(slug)}/lead-capture`,
@@ -188,14 +197,21 @@ export async function updateLeadCaptureEnabled(
       },
     );
     if (!res.ok) {
+      let message = `Server returned ${res.status}`;
+      try {
+        const err = (await res.json()) as { error?: string };
+        if (err.error) message = err.error;
+      } catch {
+        // ignore parse errors
+      }
       console.warn(`[profile] lead-capture update failed (${res.status}) for slug=${slug}`);
-      return null;
+      return { ok: false, error: message };
     }
     const data = (await res.json()) as { leadCaptureEnabled?: boolean };
-    return data.leadCaptureEnabled !== false;
+    return { ok: true, enabled: data.leadCaptureEnabled !== false };
   } catch (error) {
     console.warn('[profile] lead-capture update error:', error);
-    return null;
+    return { ok: false, error: 'Network error — could not reach profile server' };
   }
 }
 

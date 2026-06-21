@@ -50,6 +50,7 @@ type AuthContextValue = {
   signInWithProvider: (method: Exclude<AuthMethod, 'email'>, email?: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (patch: Partial<StoredUser>) => Promise<void>;
+  patchUserLocal: (patch: Partial<StoredUser>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -171,6 +172,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const patchUserLocal = useCallback(async (patch: Partial<StoredUser>) => {
+    const current = userRef.current;
+    if (!current) return;
+
+    const nextUser = { ...current, ...patch };
+    await saveUser(nextUser);
+    setUser(nextUser);
+  }, []);
+
   const updateUser = useCallback(async (patch: Partial<StoredUser>) => {
     const current = userRef.current;
     if (!current) return;
@@ -191,8 +201,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithProvider,
       signOut,
       updateUser,
+      patchUserLocal,
     }),
-    [user, isLoading, signUp, signIn, signInWithProvider, signOut, updateUser],
+    [user, isLoading, signUp, signIn, signInWithProvider, signOut, updateUser, patchUserLocal],
   );
 
   if (isLoading) {
