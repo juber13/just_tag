@@ -228,6 +228,45 @@ app.put('/api/profiles/:slug', async (req, res) => {
     }
 });
 
+app.patch('/api/profiles/:slug/lead-capture', async (req, res) => {
+    try {
+        const profile = await findProfile(req.params.slug);
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        const ownerEmail = req.headers['x-owner-email']?.trim().toLowerCase();
+        if (!isProfileOwner(profile, ownerEmail)) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (typeof req.body?.leadCaptureEnabled !== 'boolean') {
+            return res.status(400).json({ error: 'leadCaptureEnabled (boolean) is required' });
+        }
+
+        const leadCaptureEnabled = req.body.leadCaptureEnabled;
+
+        await db.collection('profiles').updateOne(
+            { slug: profile.slug },
+            {
+                $set: {
+                    leadCaptureEnabled,
+                    updatedAt: new Date().toISOString(),
+                },
+            },
+        );
+
+        const updated = await db.collection('profiles').findOne({ slug: profile.slug });
+        res.json({
+            slug: updated.slug,
+            leadCaptureEnabled: updated.leadCaptureEnabled !== false,
+        });
+    } catch (error) {
+        console.error('Update lead capture failed:', error);
+        res.status(500).json({ error: 'Failed to update lead capture setting' });
+    }
+});
+
 function mapContactDoc(doc) {
     return {
         id: doc._id?.toString() ?? doc.id,

@@ -28,6 +28,7 @@ import {
 import {
   applyServerProfileToUser,
   fetchPublicProfile,
+  updateLeadCaptureEnabled,
   updateProfileDetails,
 } from '../../services/profileApi';
 import {
@@ -93,7 +94,6 @@ export function ProfileScreen({ navigation }: Props) {
   useEffect(() => {
     if (!user) return;
     applyProfileFields(user);
-    setLeadOn(user.leadCaptureEnabled !== false);
   }, [user, applyProfileFields]);
 
   const loadProfileFromServer = useCallback(async () => {
@@ -209,9 +209,17 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   const handleLeadToggle = async (enabled: boolean) => {
-    setLeadOn(enabled);
     if (!user) return;
-    await updateUser({ leadCaptureEnabled: enabled });
+    const previous = leadOn;
+    setLeadOn(enabled);
+    const saved = await updateLeadCaptureEnabled(profileSlug, ownerEmail, enabled);
+    if (saved === null) {
+      setLeadOn(previous);
+      Alert.alert('Update failed', 'Could not save lead setting. Check server connection.');
+      return;
+    }
+    setLeadOn(saved);
+    await updateUser({ leadCaptureEnabled: saved });
   };
 
   const handleLinkToggle = async (link: SavedProfileLink, enabled: boolean) => {

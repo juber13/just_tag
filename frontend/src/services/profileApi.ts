@@ -172,6 +172,33 @@ export async function updateProfileDetails(
   }
 }
 
+export async function updateLeadCaptureEnabled(
+  slug: string,
+  ownerEmail: string,
+  enabled: boolean,
+): Promise<boolean | null> {
+  if (!PROFILE_SYNC_ENABLED || !slug.trim()) return null;
+  try {
+    const res = await fetch(
+      `${PROFILE_SERVER_URL}/api/profiles/${encodeURIComponent(slug)}/lead-capture`,
+      {
+        method: 'PATCH',
+        headers: ownerHeaders(ownerEmail),
+        body: JSON.stringify({ leadCaptureEnabled: enabled }),
+      },
+    );
+    if (!res.ok) {
+      console.warn(`[profile] lead-capture update failed (${res.status}) for slug=${slug}`);
+      return null;
+    }
+    const data = (await res.json()) as { leadCaptureEnabled?: boolean };
+    return data.leadCaptureEnabled !== false;
+  } catch (error) {
+    console.warn('[profile] lead-capture update error:', error);
+    return null;
+  }
+}
+
 export async function fetchPublicProfile(slug: string): Promise<PublicProfile | null> {
   try {
     const res = await fetch(
