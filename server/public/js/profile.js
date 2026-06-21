@@ -508,7 +508,24 @@ function createTile(label, iconKey, onClick, href) {
   return btn;
 }
 
-function renderLinksGrid(links, payments) {
+function buildRoleLine(data) {
+  const jobTitle = data.jobTitle?.trim() || '';
+  const organization = data.organization?.trim() || '';
+  const about = data.about?.trim() || '';
+
+  let left = jobTitle;
+  if (jobTitle && organization) {
+    left = `${jobTitle} @ ${organization}`;
+  } else if (!jobTitle && organization) {
+    left = organization;
+  }
+
+  if (left && about) {
+    return `${left} | ${about}`;
+  }
+
+  return left || about || '';
+}
   const grid = document.getElementById('links-grid');
   grid.innerHTML = '';
 
@@ -587,23 +604,7 @@ async function loadProfile() {
     }
 
     document.getElementById('name').textContent = data.fullName || 'Unnamed';
-    const roleParts = [data.jobTitle, data.organization].filter(Boolean);
-    document.getElementById('role').textContent =
-      roleParts.length >= 2
-        ? `${roleParts[0]} @ ${roleParts.slice(1).join(' ')}`
-        : roleParts.join(' ') || '';
-
-    const aboutEl = document.getElementById('about');
-    const aboutText = data.about?.trim();
-    if (aboutEl) {
-      if (aboutText) {
-        aboutEl.textContent = aboutText;
-        aboutEl.classList.remove('hidden');
-      } else {
-        aboutEl.textContent = '';
-        aboutEl.classList.add('hidden');
-      }
-    }
+    document.getElementById('role').textContent = buildRoleLine(data);
 
     renderLinksGrid(data.links, data.payments);
     syncContactModalHeader(data);
