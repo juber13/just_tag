@@ -1,5 +1,25 @@
 const PAYMENT_IDS = new Set(['google-pay', 'paytm', 'phonepe']);
 
+const CATALOG_LINK_IDS = new Set([
+  'phone',
+  'whatsapp',
+  'instagram',
+  'facebook',
+  'twitter',
+  'tiktok',
+  'video',
+  'linkedin',
+  'snapchat',
+  'threads',
+  'telegram',
+  'discord',
+  'messenger',
+  'twitch',
+  'spotify',
+  'link',
+  'document',
+]);
+
 /** Brand icons: `tile` = solid color + white glyph; `logo` = full-color logo on white */
 const ICON_DEFS = {
   whatsapp: { file: 'whatsapp.svg', tile: '#25D366' },
@@ -15,6 +35,9 @@ const ICON_DEFS = {
   catalog: { file: 'catalog.svg', tile: '#111111' },
   facetime: { file: 'facetime.svg', tile: '#34C759' },
   twitter: { file: 'twitter.svg', tile: '#000000' },
+  tiktok: { letter: 'T', tile: '#000000' },
+  snapchat: { letter: 'S', tile: '#FFFC00', darkText: true },
+  threads: { letter: '@', tile: '#000000' },
   googlepay: { file: 'googlepay.svg', logo: true },
   paytm: { file: 'paytm.svg', logo: true },
   phonepe: { file: 'phonepe.svg', logo: true },
@@ -106,6 +129,21 @@ const LINK_META = {
     label: 'Twitter X',
     href: (v) => (v.startsWith('http') ? v : `https://x.com/${v.replace('@', '')}`),
     icon: 'twitter',
+  },
+  tiktok: {
+    label: 'TikTok',
+    href: (v) => (v.startsWith('http') ? v : `https://tiktok.com/@${v.replace('@', '')}`),
+    icon: 'tiktok',
+  },
+  snapchat: {
+    label: 'Snapchat',
+    href: (v) => (v.startsWith('http') ? v : `https://snapchat.com/add/${v.replace('@', '')}`),
+    icon: 'snapchat',
+  },
+  threads: {
+    label: 'Threads',
+    href: (v) => (v.startsWith('http') ? v : `https://threads.net/@${v.replace('@', '')}`),
+    icon: 'threads',
   },
   clubhouse: {
     label: 'Clubhouse',
@@ -477,7 +515,14 @@ function renderLinksGrid(links, payments) {
   const tiles = [];
 
   for (const link of links || []) {
-    if (!link.value?.trim() || PAYMENT_IDS.has(link.id)) continue;
+    if (
+      !link.value?.trim() ||
+      PAYMENT_IDS.has(link.id) ||
+      !CATALOG_LINK_IDS.has(link.id) ||
+      link.enabled === false
+    ) {
+      continue;
+    }
     const meta = LINK_META[link.id] || {
       label: link.label || link.id,
       href: (v) => externalHref(v),
@@ -485,18 +530,6 @@ function renderLinksGrid(links, payments) {
     };
     tiles.push(
       createTile(link.label || meta.label, meta.icon, null, meta.href(link.value.trim())),
-    );
-  }
-
-  for (const p of payments || []) {
-    if (!p.upiId?.trim()) continue;
-    const meta = LINK_META[p.provider] || { label: p.provider, icon: 'link', payment: true };
-    tiles.push(
-      createTile(meta.label, meta.icon, () => {
-        document.getElementById('payment-title').textContent = meta.label;
-        document.getElementById('payment-id').textContent = p.upiId;
-        openModal('payment-modal');
-      }),
     );
   }
 
@@ -559,6 +592,18 @@ async function loadProfile() {
       roleParts.length >= 2
         ? `${roleParts[0]} @ ${roleParts.slice(1).join(' ')}`
         : roleParts.join(' ') || '';
+
+    const aboutEl = document.getElementById('about');
+    const aboutText = data.about?.trim();
+    if (aboutEl) {
+      if (aboutText) {
+        aboutEl.textContent = aboutText;
+        aboutEl.classList.remove('hidden');
+      } else {
+        aboutEl.textContent = '';
+        aboutEl.classList.add('hidden');
+      }
+    }
 
     renderLinksGrid(data.links, data.payments);
     syncContactModalHeader(data);

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { filterCatalogLinks, isCatalogLinkId } from '../data/appsLinksCatalog';
 import { SavedProfileLink } from '../types/profile';
 
 const prefix = (email: string) => `profile_links:${email.trim().toLowerCase()}`;
@@ -7,7 +8,13 @@ export async function getProfileLinks(email: string): Promise<SavedProfileLink[]
   const raw = await AsyncStorage.getItem(prefix(email));
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as SavedProfileLink[];
+    const parsed = JSON.parse(raw) as SavedProfileLink[];
+    const normalized = filterCatalogLinks(parsed);
+    const needsCleanup = parsed.some((link) => !link.value.trim() || !isCatalogLinkId(link.id));
+    if (needsCleanup) {
+      await AsyncStorage.setItem(prefix(email), JSON.stringify(normalized));
+    }
+    return normalized;
   } catch {
     return [];
   }
@@ -18,6 +25,7 @@ export async function saveProfileLink(
   link: SavedProfileLink,
 ): Promise<SavedProfileLink[]> {
   const existing = await getProfileLinks(email);
+  if (!isCatalogLinkId(link.id)) return existing;
   const prev = existing.find((l) => l.id === link.id);
   const next = existing.filter((l) => l.id !== link.id);
   if (link.value.trim()) {
@@ -60,20 +68,4 @@ export async function removeProfileLink(email: string, id: string): Promise<Save
   const next = existing.filter((l) => l.id !== id);
   await AsyncStorage.setItem(prefix(email), JSON.stringify(next));
   return next;
-}
-
-export function serverLinksToSaved(
-  links: SavedProfileLink[],
-  payments: { provider: string; upiId: string }[],
-  catalogColors: Record<string, string>,
-  catalogLabels: Record<string, string>,
-): SavedProfileLink[] {
-  const paymentLinks: SavedProfileLink[] = payments.map((p) => ({
-    id: p.provider,
-    label: catalogLabels[p.provider] ?? p.provider,
-    category: 'Payment',
-    value: p.upiId,
-    color: catalogColors[p.provider] ?? '#333',
-  }));
-  return [...links, ...paymentLinks];
 }

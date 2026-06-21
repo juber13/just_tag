@@ -11,9 +11,10 @@ type Props = {
   links: SavedProfileLink[];
   onReorder: (links: SavedProfileLink[]) => void;
   onToggle: (link: SavedProfileLink, enabled: boolean) => void;
+  onRemove: (link: SavedProfileLink) => void;
 };
 
-export function ProfileSavedLinksList({ links, onReorder, onToggle }: Props) {
+export function ProfileSavedLinksList({ links, onReorder, onToggle, onRemove }: Props) {
   return (
     <DraggableFlatList
       data={links}
@@ -26,6 +27,7 @@ export function ProfileSavedLinksList({ links, onReorder, onToggle }: Props) {
           <ProfileSavedLinkRow
             link={item}
             onToggle={(enabled) => onToggle(item, enabled)}
+            onRemove={() => onRemove(item)}
             onDrag={drag}
             isDragging={isActive}
           />

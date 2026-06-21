@@ -160,6 +160,15 @@ body {
   padding: 22px var(--side-pad-r) 36px var(--side-pad);
 }
 
+.about {
+  margin: 0 0 20px;
+  font-size: clamp(0.85rem, 3.4vw, 0.95rem);
+  color: #444;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .connect-pill {
   display: block;
   width: 100%;

@@ -36,6 +36,7 @@ import {
 } from '../../services/profileApi';
 import {
   getProfileLinks,
+  removeProfileLink,
   reorderProfileLinks,
   setProfileLinkEnabled,
 } from '../../services/profileLinksStorage';
@@ -105,7 +106,7 @@ export function ProfileScreen({ navigation }: Props) {
       return;
     }
     const links = await getProfileLinks(user.email);
-    setSavedLinks(links.filter((l) => l.value.trim()));
+    setSavedLinks(links);
   }, [user?.email]);
 
   useEffect(() => {
@@ -281,7 +282,7 @@ export function ProfileScreen({ navigation }: Props) {
   const handleLinkToggle = async (link: SavedProfileLink, enabled: boolean) => {
     if (!user) return;
     const next = await setProfileLinkEnabled(user.email, link.id, enabled);
-    setSavedLinks(next.filter((l) => l.value.trim()));
+    setSavedLinks(next);
     await syncUserProfile(user);
   };
 
@@ -292,7 +293,14 @@ export function ProfileScreen({ navigation }: Props) {
       user.email,
       ordered.map((l) => l.id),
     );
-    setSavedLinks(next.filter((l) => l.value.trim()));
+    setSavedLinks(next);
+    void syncUserProfile(user);
+  };
+
+  const handleLinkRemove = async (link: SavedProfileLink) => {
+    if (!user) return;
+    const next = await removeProfileLink(user.email, link.id);
+    setSavedLinks(next);
     void syncUserProfile(user);
   };
 
@@ -461,6 +469,7 @@ export function ProfileScreen({ navigation }: Props) {
               links={savedLinks}
               onReorder={(ordered) => void handleLinkReorder(ordered)}
               onToggle={(link, enabled) => void handleLinkToggle(link, enabled)}
+              onRemove={(link) => void handleLinkRemove(link)}
             />
           ) : (
             <Text style={styles.linksEmpty}>

@@ -5,6 +5,7 @@ import {
   profilePublicUrl,
 } from '../config/profileServer';
 import { Contact } from '../types/contact';
+import { filterCatalogLinks } from '../data/appsLinksCatalog';
 import { PublicProfile, ProfilePayment, SavedProfileLink } from '../types/profile';
 import { StoredUser } from '../types/user';
 
@@ -44,7 +45,7 @@ export function userToProfilePayload(
   user: StoredUser,
   savedLinks: SavedProfileLink[],
 ): Omit<PublicProfile, 'slug' | 'ownerEmail' | 'updatedAt'> {
-  const { links, payments } = splitLinksAndPayments(savedLinks);
+  const { links, payments } = splitLinksAndPayments(filterCatalogLinks(savedLinks));
   return {
     fullName: user.fullName,
     jobTitle: user.jobTitle,

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { AppLinkItem, getAppLinkItem } from '../../data/appsLinksCatalog';
@@ -8,6 +9,7 @@ import { AppIconTile } from './AppIconTile';
 type Props = {
   link: SavedProfileLink;
   onToggle: (enabled: boolean) => void;
+  onRemove: () => void;
   onDrag?: () => void;
   isDragging?: boolean;
 };
@@ -38,7 +40,7 @@ function DragGrip() {
   );
 }
 
-export function ProfileSavedLinkRow({ link, onToggle, onDrag, isDragging }: Props) {
+export function ProfileSavedLinkRow({ link, onToggle, onRemove, onDrag, isDragging }: Props) {
   const item = toAppLinkItem(link);
   const enabled = link.enabled !== false;
 
@@ -68,6 +70,14 @@ export function ProfileSavedLinkRow({ link, onToggle, onDrag, isDragging }: Prop
         thumbColor={colors.white}
         style={styles.switch}
       />
+      <TouchableOpacity
+        onPress={onRemove}
+        style={styles.removeBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityLabel={`Remove ${link.label}`}
+      >
+        <Ionicons name="close-circle" size={22} color={colors.textSecondary} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -95,6 +105,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  removeBtn: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingRight: spacing.xs,
   },
   grip: {
     flexDirection: 'row',

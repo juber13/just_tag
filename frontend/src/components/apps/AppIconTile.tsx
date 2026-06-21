@@ -47,7 +47,7 @@ export function AppIconTile({
             style={[
               styles.letter,
               {
-                color: item.color === '#F5EFE6' || item.color === '#FFFFFF'
+                color: item.color === '#F5EFE6' || item.color === '#FFFFFF' || item.color === '#FFFC00'
                   ? colors.black
                   : colors.white,
                 fontSize: item.letter && item.letter.length > 1 ? 14 : 22,

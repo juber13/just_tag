@@ -3,13 +3,10 @@ import {
   ensureProfileOnServer,
   syncProfileToServer,
 } from './profileApi';
-import { getProfileLinks, serverLinksToSaved } from './profileLinksStorage';
+import { getProfileLinks } from './profileLinksStorage';
 import { saveUser } from './authStorage';
-import { appsLinksCatalog } from '../data/appsLinksCatalog';
+import { filterCatalogLinks } from '../data/appsLinksCatalog';
 import { StoredUser } from '../types/user';
-
-const catalogColors = Object.fromEntries(appsLinksCatalog.map((a) => [a.id, a.color]));
-const catalogLabels = Object.fromEntries(appsLinksCatalog.map((a) => [a.id, a.label]));
 
 export async function registerAndSyncUser(user: StoredUser): Promise<StoredUser> {
   let next = { ...user };
@@ -22,12 +19,7 @@ export async function registerAndSyncUser(user: StoredUser): Promise<StoredUser>
   const localLinks = await getProfileLinks(next.email);
   const mergedFromServer =
     localLinks.length === 0
-      ? serverLinksToSaved(
-          serverProfile.links ?? [],
-          serverProfile.payments ?? [],
-          catalogColors,
-          catalogLabels,
-        )
+      ? filterCatalogLinks(serverProfile.links ?? [])
       : localLinks;
 
   if (localLinks.length === 0 && mergedFromServer.length > 0) {
