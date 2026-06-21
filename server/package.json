@@ -1,0 +1,19 @@
+{
+  "name": "justtag-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "stop": "node scripts/stop-port.js",
+    "restart": "node scripts/stop-port.js && node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "mongodb": "^7.3.0",
+    "mongoose": "^9.7.1"
+  }
+}

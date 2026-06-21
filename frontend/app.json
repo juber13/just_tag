@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "justtag",
+    "slug": "justtag",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.justagg.justtag"
+    },
+    "android": {
+      "package": "com.justagg.justtag",
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow JUSTAGG to access your photos for your profile and cover image.",
+          "cameraPermission": "Allow JUSTAGG to use the camera for your profile and cover image."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1aba530d-5e34-4796-a8b1-1a6694ad2bb8"
+      }
+    },
+    "owner": "juber33"
+  }
+}
