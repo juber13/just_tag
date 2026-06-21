@@ -1,4 +1,3 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import {
   PROFILE_SERVER_URL,
   PROFILE_SYNC_ENABLED,
@@ -18,18 +17,10 @@ function ownerHeaders(email: string): HeadersInit {
   };
 }
 
-async function readImageBase64(uri?: string): Promise<string | undefined> {
-  if (!uri?.trim()) return undefined;
-  if (uri.startsWith('data:image')) return uri;
-  if (!uri.startsWith('file://')) return undefined;
-  try {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    return `data:image/jpeg;base64,${base64}`;
-  } catch {
-    return undefined;
-  }
+function ownerUploadHeaders(email: string): HeadersInit {
+  return {
+    'X-Owner-Email': email.trim().toLowerCase(),
+  };
 }
 
 function splitLinksAndPayments(links: SavedProfileLink[]): {
@@ -52,10 +43,7 @@ function splitLinksAndPayments(links: SavedProfileLink[]): {
 export function userToProfilePayload(
   user: StoredUser,
   savedLinks: SavedProfileLink[],
-): Omit<PublicProfile, 'slug' | 'ownerEmail' | 'updatedAt'> & {
-  avatarBase64?: string;
-  coverBase64?: string;
-} {
+): Omit<PublicProfile, 'slug' | 'ownerEmail' | 'updatedAt'> {
   const { links, payments } = splitLinksAndPayments(savedLinks);
   return {
     fullName: user.fullName,
@@ -112,24 +100,52 @@ export async function syncProfileToServer(
 ): Promise<PublicProfile | null> {
   if (!PROFILE_SYNC_ENABLED || !user.profileSlug) return null;
   const payload = userToProfilePayload(user, savedLinks);
-  const avatarBase64 = await readImageBase64(user.avatarImageUri);
-  const coverBase64 = await readImageBase64(user.coverImageUri);
   try {
     const res = await fetch(
       `${PROFILE_SERVER_URL}/api/profiles/${encodeURIComponent(user.profileSlug)}`,
       {
         method: 'PUT',
         headers: ownerHeaders(user.email),
-        body: JSON.stringify({
-          ...payload,
-          ...(avatarBase64 ? { avatarBase64 } : {}),
-          ...(coverBase64 ? { coverBase64 } : {}),
-        }),
+        body: JSON.stringify(payload),
       },
     );
     if (!res.ok) return null;
     return (await res.json()) as PublicProfile;
   } catch {
+    return null;
+  }
+}
+
+export async function uploadProfileImage(
+  slug: string,
+  ownerEmail: string,
+  kind: 'avatar' | 'cover',
+  localUri: string,
+): Promise<PublicProfile | null> {
+  if (!PROFILE_SYNC_ENABLED || !slug.trim() || !localUri.startsWith('file://')) return null;
+  try {
+    const formData = new FormData();
+    formData.append('image', {
+      uri: localUri,
+      type: 'image/jpeg',
+      name: `${kind}.jpg`,
+    } as unknown as Blob);
+
+    const res = await fetch(
+      `${PROFILE_SERVER_URL}/api/profiles/${encodeURIComponent(slug)}/${kind}`,
+      {
+        method: 'POST',
+        headers: ownerUploadHeaders(ownerEmail),
+        body: formData,
+      },
+    );
+    if (!res.ok) {
+      console.warn(`[profile] ${kind} upload failed (${res.status}) for slug=${slug}`);
+      return null;
+    }
+    return (await res.json()) as PublicProfile;
+  } catch (error) {
+    console.warn(`[profile] ${kind} upload error:`, error);
     return null;
   }
 }

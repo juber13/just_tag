@@ -4,7 +4,37 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import connectToDatabase from './db.js';
 import { hashPassword, publicUser, slugFromName, verifyPassword } from './src/auth.js';
+import { deleteCloudinaryImage, uploadImageBuffer } from './src/cloudinary.js';
+import multer from 'multer';
 dotenv.config();
+
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: IMAGE_MAX_BYTES },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype?.startsWith('image/')) {
+            cb(null, true);
+            return;
+        }
+        cb(new Error('Only image files are allowed'));
+    },
+});
+
+function handleImageUpload(req, res, next) {
+    upload.single('image')(req, res, (error) => {
+        if (error instanceof multer.MulterError) {
+            const message = error.code === 'LIMIT_FILE_SIZE'
+                ? 'Image must be 5 MB or smaller'
+                : error.message;
+            return res.status(400).json({ error: message });
+        }
+        if (error) {
+            return res.status(400).json({ error: error.message || 'Invalid image upload' });
+        }
+        next();
+    });
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -175,6 +205,62 @@ app.get('/api/profiles/by-email/:email', async (req, res) => {
         console.error('Fetch profile by email failed:', error);
         res.status(500).json({ error: 'Failed to fetch profile' });
     }
+});
+
+async function uploadProfileImage(req, res, field) {
+    try {
+        const profile = await findProfile(req.params.slug);
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        const ownerEmail = req.headers['x-owner-email']?.trim().toLowerCase();
+        if (!(await isProfileOwner(profile, ownerEmail))) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (!req.file?.buffer?.length) {
+            return res.status(400).json({ error: 'Image file is required' });
+        }
+
+        const previousUrl = profile[field];
+
+        const imageUrl = await uploadImageBuffer(
+            req.file.buffer,
+            `justtag/profiles/${profile.slug}/${field === 'avatarUrl' ? 'avatar' : 'cover'}`,
+        );
+        if (!imageUrl) {
+            return res.status(500).json({ error: 'Failed to upload image' });
+        }
+
+        await db.collection('profiles').updateOne(
+            { slug: profile.slug },
+            {
+                $set: {
+                    [field]: imageUrl,
+                    updatedAt: new Date().toISOString(),
+                },
+            },
+        );
+
+        if (previousUrl && previousUrl !== imageUrl) {
+            await deleteCloudinaryImage(previousUrl);
+        }
+
+        const updated = await db.collection('profiles').findOne({ slug: profile.slug });
+        res.json(updated);
+    } catch (error) {
+        console.error(`Upload ${field} failed:`, error);
+        res.status(500).json({ error: 'Failed to upload image' });
+    }
+}
+
+app.post('/api/profiles/:slug/avatar', handleImageUpload, (req, res) => {
+    void uploadProfileImage(req, res, 'avatarUrl');
+});
+
+app.post('/api/profiles/:slug/cover', handleImageUpload, (req, res) => {
+    void uploadProfileImage(req, res, 'coverUrl');
 });
 
 app.get('/api/profiles/:slug', async (req, res) => {

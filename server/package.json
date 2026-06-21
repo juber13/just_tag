@@ -10,10 +10,12 @@
     "restart": "node scripts/stop-port.js && node server.js"
   },
   "dependencies": {
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",
     "mongodb": "^7.3.0",
-    "mongoose": "^9.7.1"
+    "mongoose": "^9.7.1",
+    "multer": "^2.2.0"
   }
 }

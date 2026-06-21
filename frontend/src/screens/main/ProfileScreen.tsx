@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ExpoFileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,6 +32,7 @@ import {
   resolveProfileSlug,
   updateLeadCaptureEnabled,
   updateProfileDetails,
+  uploadProfileImage,
 } from '../../services/profileApi';
 import {
   getProfileLinks,
@@ -48,6 +50,15 @@ import {
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
 const BANNER_HEIGHT = 180;
+
+async function deleteLocalImage(uri?: string | null) {
+  if (!uri?.startsWith('file://')) return;
+  try {
+    await ExpoFileSystem.deleteAsync(uri, { idempotent: true });
+  } catch {
+    // Picker cache files may already be gone; safe to ignore.
+  }
+}
 
 export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -129,13 +140,39 @@ export function ProfileScreen({ navigation }: Props) {
     async (target: PickTarget, uri: string) => {
       if (target === 'banner') {
         setCoverUri(uri);
-        await updateUser({ coverImageUri: uri });
+        await patchUserLocal({ coverImageUri: uri });
       } else {
         setAvatarUri(uri);
-        await updateUser({ avatarImageUri: uri });
+        await patchUserLocal({ avatarImageUri: uri });
+      }
+
+      if (!user) return;
+
+      const slug = user.profileSlug ?? (await resolveProfileSlug(user));
+      if (!slug || !ownerEmail || !uri.startsWith('file://')) return;
+
+      const kind = target === 'banner' ? 'cover' : 'avatar';
+      const serverProfile = await uploadProfileImage(slug, ownerEmail, kind, uri);
+      if (!serverProfile) {
+        Alert.alert('Upload failed', `Could not upload ${kind} image. Check server connection.`);
+        return;
+      }
+
+      const remoteUri = kind === 'cover'
+        ? profileMediaUrl(serverProfile.coverUrl)
+        : profileMediaUrl(serverProfile.avatarUrl);
+      if (remoteUri) {
+        if (kind === 'cover') {
+          setCoverUri(remoteUri);
+          await patchUserLocal({ coverImageUri: remoteUri });
+        } else {
+          setAvatarUri(remoteUri);
+          await patchUserLocal({ avatarImageUri: remoteUri });
+        }
+        await deleteLocalImage(uri);
       }
     },
-    [updateUser],
+    [patchUserLocal, user, ownerEmail],
   );
 
   const handlePick = useCallback(

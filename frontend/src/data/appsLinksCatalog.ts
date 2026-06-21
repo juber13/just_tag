@@ -229,7 +229,7 @@ export const appsLinksCatalog: AppLinkItem[] = [
     label: 'Spotify',
     category: 'Music',
     color: '#1DB954',
-    iconName: 'logo-spotify',
+    letter: 'S',
     modal: { title: 'Spotify', placeholder: 'Spotify profile URL' },
   },
   {
