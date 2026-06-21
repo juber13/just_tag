@@ -88,10 +88,10 @@ body {
   display: flex;
   align-items: flex-end;
   gap: clamp(10px, 3vw, 16px);
-  margin-top: calc(var(--avatar-size) * -0.48);
+  margin-top: calc(var(--avatar-size) * -0.38);
   position: relative;
   z-index: 2;
-  padding-top: 14px;
+  padding-top: calc(14px + var(--banner-h) * 0.1);
   padding-inline: var(--side-pad) var(--side-pad-r);
 }
 
