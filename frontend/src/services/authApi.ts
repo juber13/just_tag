@@ -1,5 +1,6 @@
 import { PROFILE_SERVER_URL, PROFILE_SYNC_ENABLED } from '../config/profileServer';
 import { AuthMethod } from '../types/user';
+import type { ServerSubscription } from './paymentApi';
 
 export type AuthUserResponse = {
   email: string;
@@ -12,6 +13,7 @@ export type AuthUserResponse = {
   profileSlug: string;
   authMethod: AuthMethod;
   createdAt: string;
+  subscription?: ServerSubscription;
 };
 
 type AuthSuccess = {

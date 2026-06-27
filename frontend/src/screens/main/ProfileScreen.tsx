@@ -21,6 +21,8 @@ import { ProfileSavedLinksList } from '../../components/apps/ProfileSavedLinksLi
 import { MainTabParamList, ProfileStackParamList } from '../../navigation/types';
 import { colors, layout, spacing, typography } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { useProductAccess } from '../../context/useProductAccess';
+import { navigateToActivateProduct } from '../../navigation/activateNavigation';
 import {
   PROFILE_CONTACTS_SLUG,
   PROFILE_OWNER_EMAIL,
@@ -65,6 +67,7 @@ export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const tabNav = navigation.getParent<BottomTabNavigationProp<MainTabParamList>>();
   const { user, updateUser, patchUserLocal } = useAuth();
+  const { isProductActive } = useProductAccess();
   const [mode, setMode] = useState<'Business' | 'Social'>('Business');
   const [leadOn, setLeadOn] = useState(true);
   const [personalOn, setPersonalOn] = useState(false);
@@ -256,6 +259,20 @@ export function ProfileScreen({ navigation }: Props) {
 
   const handleLeadToggle = async (enabled: boolean) => {
     if (!user) return;
+    if (!isProductActive) {
+      Alert.alert(
+        'Activate required',
+        'Lead capture is available after you activate your product.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Activate',
+            onPress: () => tabNav?.navigate('MenuTab', { screen: 'ActivateProduct' }),
+          },
+        ],
+      );
+      return;
+    }
     if (!ownerEmail) {
       Alert.alert('Sign in required', 'Please sign in to change lead capture settings.');
       return;
@@ -304,6 +321,14 @@ export function ProfileScreen({ navigation }: Props) {
     void syncUserProfile(user);
   };
 
+  const handleSharePress = () => {
+    if (!isProductActive) {
+      navigateToActivateProduct(navigation);
+      return;
+    }
+    tabNav?.navigate('ShareTab');
+  };
+
   const displayCover = coverUri ?? user?.coverImageUri ?? null;
   const displayAvatar = avatarUri ?? user?.avatarImageUri ?? null;
   const coverOverlayColor = displayCover ? colors.white : colors.black;
@@ -344,7 +369,7 @@ export function ProfileScreen({ navigation }: Props) {
               <View style={[styles.coverSideSlot, styles.coverSideSlotRight]}>
                 <Pressable
                   style={styles.coverIconBtn}
-                  onPress={() => tabNav?.navigate('ShareTab')}
+                  onPress={handleSharePress}
                   accessibilityLabel="Share"
                   hitSlop={8}
                 >
@@ -385,11 +410,14 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
           <View style={styles.toggles}>
             <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>Lead</Text>
+              <Text style={[styles.toggleLabel, !isProductActive && styles.toggleLabelLocked]}>
+                Lead
+              </Text>
               <View style={styles.switchWrap}>
                 <Switch
                   value={leadOn}
                   onValueChange={(enabled) => void handleLeadToggle(enabled)}
+                  disabled={!isProductActive}
                   trackColor={{ false: colors.borderLight, true: colors.toggleGreen }}
                   thumbColor={colors.white}
                 />
@@ -568,6 +596,7 @@ const styles = StyleSheet.create({
     minHeight: 28,
   },
   toggleLabel: { ...typography.bodyBold, fontSize: 15, color: colors.black },
+  toggleLabelLocked: { color: colors.textSecondary },
   switchWrap: { transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }] },
   fields: { paddingHorizontal: layout.screenPadding, marginTop: spacing.lg, gap: spacing.md },
   field: {

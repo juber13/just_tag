@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { MenuScreen } from '../screens/main/MenuScreen';
+import { ActivateProductScreen } from '../screens/stack/ActivateProductScreen';
 import { MenuDetailScreen } from '../screens/stack/MenuDetailScreen';
 import { ShareFeedbackScreen } from '../screens/stack/ShareFeedbackScreen';
 import { MenuStackParamList } from './types';
@@ -10,6 +11,7 @@ export function MenuStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MenuMain" component={MenuScreen} />
+      <Stack.Screen name="ActivateProduct" component={ActivateProductScreen} />
       <Stack.Screen name="MenuDetail" component={MenuDetailScreen} />
       <Stack.Screen name="ShareFeedback" component={ShareFeedbackScreen} />
     </Stack.Navigator>

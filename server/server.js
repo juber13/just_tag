@@ -5,6 +5,19 @@ import dotenv from 'dotenv';
 import connectToDatabase from './db.js';
 import { hashPassword, publicUser, slugFromName, verifyPassword } from './src/auth.js';
 import { deleteCloudinaryImage, uploadImageBuffer } from './src/cloudinary.js';
+import {
+    ensureAnalyticsIndexes,
+    getProfileAnalytics,
+    parseAnalyticsRange,
+    recordProfileLinkVisit,
+    recordProfileLinkClick,
+} from './src/analytics.js';
+import {
+    handleRazorpayWebhook,
+    registerPaymentRoutes,
+    requireActiveSubscription,
+} from './src/paymentRoutes.js';
+import { isProfilePubliclyVisible } from './src/subscription.js';
 import multer from 'multer';
 dotenv.config();
 
@@ -83,6 +96,19 @@ async function isProfileOwner(profile, ownerEmail) {
     return allowed.length === 0;
 }
 
+function getDb() {
+    return db;
+}
+
+// Razorpay webhook must read the raw request body (register before express.json).
+app.post(
+    '/api/webhooks/razorpay',
+    express.raw({ type: 'application/json' }),
+    (req, res) => {
+        void handleRazorpayWebhook(req, res, getDb);
+    },
+);
+
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
@@ -132,6 +158,7 @@ app.post('/api/auth/register', async (req, res) => {
             avatarUrl: null,
             coverUrl: null,
             leadCaptureEnabled: true,
+            isPublished: false,
             links: [],
             payments: [],
             updatedAt: now,
@@ -148,6 +175,7 @@ app.post('/api/auth/register', async (req, res) => {
             profileSlug,
             passwordHash: hashPassword(password),
             authMethod: 'email',
+            subscription: { status: 'inactive' },
             createdAt: now,
         };
 
@@ -191,6 +219,8 @@ app.post('/api/auth/login', async (req, res) => {
         res.status(500).json({ error: 'Failed to sign in' });
     }
 });
+
+registerPaymentRoutes(app, getDb);
 
 app.use(express.static(PUBLIC_DIR));
 
@@ -268,6 +298,12 @@ app.get('/api/profiles/:slug', async (req, res) => {
         const profile = await findProfile(req.params.slug);
         if (!profile) {
             return res.status(404).json({ error: 'Profile not found' });
+        }
+        if (!isProfilePubliclyVisible(profile)) {
+            return res.status(403).json({
+                error: 'Profile not activated',
+                code: 'NOT_PUBLISHED',
+            });
         }
         res.json(profile);
     } catch (error) {
@@ -387,6 +423,11 @@ app.get('/api/profiles/:slug/contacts', async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
+        const subscriptionCheck = await requireActiveSubscription(db, ownerEmail);
+        if (!subscriptionCheck.ok) {
+            return res.status(subscriptionCheck.status).json({ error: subscriptionCheck.error });
+        }
+
         const slugVariants = [
             profile.slug,
             req.params.slug,
@@ -405,6 +446,71 @@ app.get('/api/profiles/:slug/contacts', async (req, res) => {
     }
 });
 
+app.get('/p/:slug', async (req, res) => {
+    try {
+        const profile = await findProfile(req.params.slug);
+        if (profile) {
+            await recordProfileLinkVisit(db, profile.slug);
+        }
+    } catch (error) {
+        console.warn('Profile link visit tracking failed:', error);
+    }
+    res.sendFile(path.join(PUBLIC_DIR, 'profile.html'));
+});
+
+app.post('/api/profiles/:slug/events', async (req, res) => {
+    try {
+        const profile = await findProfile(req.params.slug);
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        const type = String(req.body?.type || '').trim().toLowerCase();
+        if (type !== 'click') {
+            return res.status(400).json({ error: 'Only link click events are accepted' });
+        }
+
+        const result = await recordProfileLinkClick(db, profile.slug, req.body ?? {}, profile);
+        if (result.error) {
+            return res.status(400).json({ error: result.error });
+        }
+        if (result.ignored) {
+            return res.status(204).end();
+        }
+
+        res.status(201).json({ ok: true });
+    } catch (error) {
+        console.error('Record link click failed:', error);
+        res.status(500).json({ error: 'Failed to record click' });
+    }
+});
+
+app.get('/api/profiles/:slug/analytics', async (req, res) => {
+    try {
+        const profile = await findProfile(req.params.slug);
+        if (!profile) {
+            return res.status(404).json({ error: 'Profile not found' });
+        }
+
+        const ownerEmail = req.headers['x-owner-email']?.trim().toLowerCase();
+        if (!(await isProfileOwner(profile, ownerEmail))) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const subscriptionCheck = await requireActiveSubscription(db, ownerEmail);
+        if (!subscriptionCheck.ok) {
+            return res.status(subscriptionCheck.status).json({ error: subscriptionCheck.error });
+        }
+
+        const range = parseAnalyticsRange(req.query.range);
+        const analytics = await getProfileAnalytics(db, profile, req.params.slug, range);
+        res.json(analytics);
+    } catch (error) {
+        console.error('Fetch analytics failed:', error);
+        res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+});
+
 app.post('/api/profiles/:slug/contacts', async (req, res) => {
     try {
         const { name, phone } = req.body ?? {};
@@ -415,6 +521,9 @@ app.post('/api/profiles/:slug/contacts', async (req, res) => {
         const profile = await findProfile(req.params.slug);
         if (profile?.leadCaptureEnabled === false) {
             return res.status(403).json({ error: 'Lead capture is disabled for this profile' });
+        }
+        if (profile && !isProfilePubliclyVisible(profile)) {
+            return res.status(403).json({ error: 'Profile not activated' });
         }
 
         await db.collection('contacts').insertOne({
@@ -429,12 +538,13 @@ app.post('/api/profiles/:slug/contacts', async (req, res) => {
     }
 });
 
-app.get('/p/:slug', (req, res) => {
-    res.sendFile(path.join(PUBLIC_DIR, 'profile.html'));
-});
-
-connectToDatabase().then((database) => {
+connectToDatabase().then(async (database) => {
     db = database;
+    try {
+        await ensureAnalyticsIndexes(db);
+    } catch (error) {
+        console.warn('Analytics index setup failed:', error);
+    }
     const port = Number(process.env.PORT) || 3001;
     app.listen(port, () => {
         console.log(`Server is running on port ${port}`);

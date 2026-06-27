@@ -5,6 +5,7 @@ import { OutlineButton } from '../../components/ui/OutlineButton';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { AUTH_ENABLED } from '../../config/appConfig';
 import { useAuth } from '../../context/AuthContext';
+import { useProductAccess } from '../../context/useProductAccess';
 import { MENU_ITEM_ROUTES } from '../../data/menuContent';
 import { MenuStackParamList } from '../../navigation/types';
 import { colors, layout, spacing, typography } from '../../theme';
@@ -15,6 +16,7 @@ type Props = NativeStackScreenProps<MenuStackParamList, 'MenuMain'>;
 
 export function MenuScreen({ navigation }: Props) {
   const { user, signOut } = useAuth();
+  const { isProductActive } = useProductAccess();
 
   return (
     <ScrollView
@@ -57,7 +59,26 @@ export function MenuScreen({ navigation }: Props) {
         <Text style={styles.progressText}>0/5 Completed</Text>
       </View>
 
-      <PrimaryButton title="Activate Product" variant="blue" style={styles.blueBtn} />
+      {isProductActive ? (
+        <Pressable
+          style={styles.activeCard}
+          onPress={() => navigation.navigate('ActivateProduct')}
+        >
+          <Ionicons name="checkmark-circle" size={22} color={colors.toggleGreen} />
+          <View style={styles.activeCardText}>
+            <Text style={styles.activeCardTitle}>Product Active</Text>
+            <Text style={styles.activeCardSubtitle}>Your profile is live</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </Pressable>
+      ) : (
+        <PrimaryButton
+          title="Activate Product"
+          variant="blue"
+          style={styles.blueBtn}
+          onPress={() => navigation.navigate('ActivateProduct')}
+        />
+      )}
 
       {MENU_ITEMS.map((item) => (
         <Pressable
@@ -181,6 +202,34 @@ const styles = StyleSheet.create({
   },
   blueBtn: {
     marginBottom: spacing.lg,
+  },
+  activeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: layout.cardRadius,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.toggleGreen,
+    elevation: 1,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+  },
+  activeCardText: {
+    flex: 1,
+  },
+  activeCardTitle: {
+    ...typography.bodyBold,
+    color: colors.black,
+  },
+  activeCardSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   menuRow: {
     flexDirection: 'row',

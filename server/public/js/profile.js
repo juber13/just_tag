@@ -262,6 +262,29 @@ function getSlugFromPath() {
   return parts[parts.length - 1] || '';
 }
 
+function trackLinkClick(linkId, linkLabel) {
+  const slug = getSlugFromPath();
+  if (!slug || !linkId) return;
+
+  const payload = JSON.stringify({
+    type: 'click',
+    linkId,
+    linkLabel,
+  });
+  const url = `/api/profiles/${encodeURIComponent(slug)}/events`;
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+    }
+  });
+}
+
 function absUrl(path) {
   if (!path) return null;
   if (path.startsWith('http') || path.startsWith('data:')) return path;
@@ -483,7 +506,7 @@ function createIconElement(iconKey) {
   return wrap;
 }
 
-function createTile(label, iconKey, onClick, href) {
+function createTile(label, iconKey, onClick, href, linkId) {
   const labelEl = document.createElement('span');
   labelEl.className = 'link-label';
   labelEl.textContent = label;
@@ -496,6 +519,9 @@ function createTile(label, iconKey, onClick, href) {
     a.href = href;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
+    a.addEventListener('click', () => {
+      trackLinkClick(linkId, label);
+    });
     a.append(iconWrap, labelEl);
     return a;
   }
@@ -548,7 +574,13 @@ function renderLinksGrid(links, payments) {
       icon: link.id in ICON_DEFS ? link.id : 'link',
     };
     tiles.push(
-      createTile(link.label || meta.label, meta.icon, null, meta.href(link.value.trim())),
+      createTile(
+        link.label || meta.label,
+        meta.icon,
+        null,
+        meta.href(link.value.trim()),
+        link.id,
+      ),
     );
   }
 
@@ -577,7 +609,20 @@ async function loadProfile() {
 
   try {
     const res = await fetch(`/api/profiles/${encodeURIComponent(slug)}`);
-    if (!res.ok) throw new Error('Profile not found');
+    if (!res.ok) {
+      let message = 'Profile not found';
+      try {
+        const body = await res.json();
+        if (body?.code === 'NOT_PUBLISHED') {
+          message = 'This profile is not activated yet.';
+        } else if (body?.error) {
+          message = body.error;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      throw new Error(message);
+    }
     const data = await res.json();
 
     loading.classList.add('hidden');

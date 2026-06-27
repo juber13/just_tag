@@ -7,13 +7,29 @@ import { ScreenHeader } from '../../components/layout/ScreenHeader';
 import { OutlineButton } from '../../components/ui/OutlineButton';
 import { MainStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
+import { useProductAccess } from '../../context/useProductAccess';
+import { ProductLockedView } from '../../components/subscription/ProductLockedView';
 import { colors, layout, spacing, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'SignaturePreview'>;
 
 export function SignaturePreviewScreen({ navigation }: Props) {
   const { user } = useAuth();
+  const { isProductActive } = useProductAccess();
   const [includeQr, setIncludeQr] = useState(true);
+
+  if (!isProductActive) {
+    return (
+      <View style={styles.lockedRoot}>
+        <ScreenHeader title="Signature Preview" onBack={() => navigation.goBack()} />
+        <ProductLockedView
+          title="Email signature"
+          message="Activate your product to create an email signature with your profile QR code."
+          benefits={['Branded email signature', 'Embedded profile QR code', 'Download ready to use']}
+        />
+      </View>
+    );
+  }
 
   return (
     <ScreenContainer scroll contentStyle={styles.content}>
@@ -55,6 +71,10 @@ export function SignaturePreviewScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  lockedRoot: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
   content: {
     paddingHorizontal: layout.screenPadding,
     paddingBottom: 100,

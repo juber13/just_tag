@@ -20,6 +20,7 @@ import { loginOnServer, registerOnServer } from '../services/authApi';
 import { AUTH_ENABLED, GUEST_USER } from '../config/appConfig';
 import { profilePublicUrl } from '../config/profileServer';
 import { registerAndSyncUser, syncUserProfile } from '../services/profileSync';
+import { applySubscriptionFromServer } from '../services/paymentApi';
 import { clearLegacyProfileMedia } from '../services/profileMediaStorage';
 import { AuthMethod, createStoredUser, StoredUser } from '../types/user';
 import { colors } from '../theme';
@@ -68,6 +69,7 @@ function serverAuthToStoredUser(
     about: authUser.about,
     profileSlug: authUser.profileSlug,
     profileUrl: authUser.profileSlug ? profilePublicUrl(authUser.profileSlug) : '',
+    subscriptionStatus: authUser.subscription?.status === 'active' ? 'active' : 'inactive',
     authMethod: authUser.authMethod,
     createdAt: authUser.createdAt,
   });
@@ -100,7 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const stored = await getLoggedInUser();
         if (mounted) {
           if (stored) {
-            setUser(await registerAndSyncUser(stored));
+            const synced = await registerAndSyncUser(stored);
+            const withSubscription = {
+              ...synced,
+              ...(await applySubscriptionFromServer(synced)),
+            };
+            await saveUser(withSubscription);
+            setUser(withSubscription);
           } else {
             setUser(null);
           }
@@ -118,8 +126,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const completeLogin = useCallback(async (nextUser: StoredUser) => {
     await clearLegacyProfileMedia();
     const synced = await registerAndSyncUser(nextUser);
-    await setSession(synced.email);
-    setUser(synced);
+    const withSubscription = {
+      ...synced,
+      ...(await applySubscriptionFromServer(synced)),
+    };
+    await setSession(withSubscription.email);
+    setUser(withSubscription);
   }, []);
 
   const signUp = useCallback(

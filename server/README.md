@@ -45,6 +45,22 @@ Server runs at **http://localhost:3000**
 | PUT | `/api/profiles/:slug` | Update (header `X-Owner-Email` required) |
 | POST | `/api/profiles/:slug/contacts` | Lead form submission |
 
+| POST | `/api/payments/razorpay/create-order` | Create Razorpay order (header `X-Owner-Email`) |
+| POST | `/api/payments/razorpay/verify` | Verify payment after checkout |
+| GET | `/api/me/subscription` | Subscription status for logged-in user |
+| POST | `/api/webhooks/razorpay` | Razorpay webhook (server only) |
+
+## Razorpay setup
+
+1. Copy `server/.env.example` values into `server/.env`.
+2. Add your Razorpay **Key ID**, **Key Secret**, and **Webhook Secret**.
+3. In the Razorpay dashboard, set the webhook URL to:
+   `https://YOUR_SERVER/api/webhooks/razorpay`
+4. Enable the `payment.captured` event.
+5. Restart the server and use **Pay & Activate** in the app Menu.
+
+Test cards: https://razorpay.com/docs/payments/payments/test-card-details/
+
 ## Web profile page
 
 Opening `/p/{slug}` shows:

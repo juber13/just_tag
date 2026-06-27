@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { publicSubscription } from './subscription.js';
 
 const SCRYPT_OPTIONS = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
@@ -41,5 +42,6 @@ export function publicUser(user) {
         profileSlug: user.profileSlug ?? '',
         authMethod: user.authMethod ?? 'email',
         createdAt: user.createdAt,
+        subscription: publicSubscription(user),
     };
 }

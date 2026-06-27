@@ -4,13 +4,16 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ProductLockedView } from '../../components/subscription/ProductLockedView';
 import { ProfileQrCode } from '../../components/share/ProfileQrCode';
 import { QrDownloadButton } from '../../components/share/QrDownloadButton';
 import { PROFILE_QR_BACKGROUND, PROFILE_QR_SIZE } from '../../utils/qrConstants';
 import { OutlineButton } from '../../components/ui/OutlineButton';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { MainStackParamList } from '../../navigation/types';
+import { navigateToActivateProduct } from '../../navigation/activateNavigation';
 import { useAuth } from '../../context/AuthContext';
+import { useProductAccess } from '../../context/useProductAccess';
 import { shareProfileQrImage } from '../../services/profileQrDownload';
 import { profilePublicUrl } from '../../config/profileServer';
 import { colors, layout, spacing, typography } from '../../theme';
@@ -24,22 +27,39 @@ const SHARE_OPTIONS = [
 
 export function ShareScreen() {
   const { user } = useAuth();
+  const { isProductActive } = useProductAccess();
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const [offline, setOffline] = useState(false);
   const [savingQr, setSavingQr] = useState(false);
 
   const profileLink = useMemo(() => {
+    if (!isProductActive) return '';
     const url = user?.profileUrl?.trim();
     if (url) return url;
     if (user?.profileSlug) return profilePublicUrl(user.profileSlug);
     return '';
-  }, [user?.profileUrl, user?.profileSlug]);
+  }, [isProductActive, user?.profileUrl, user?.profileSlug]);
 
   const goSignature = () => {
     navigation.navigate('SignaturePreview');
   };
 
+  const promptActivate = useCallback(() => {
+    Alert.alert(
+      'Activate required',
+      'Activate your product to unlock sharing and your profile link.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Activate', onPress: () => navigateToActivateProduct(navigation) },
+      ],
+    );
+  }, [navigation]);
+
   const handleDownloadQr = useCallback(async () => {
+    if (!isProductActive) {
+      promptActivate();
+      return;
+    }
     if (!profileLink || savingQr) return;
 
     setSavingQr(true);
@@ -68,9 +88,13 @@ export function ShareScreen() {
     } finally {
       setSavingQr(false);
     }
-  }, [profileLink, savingQr]);
+  }, [isProductActive, profileLink, promptActivate, savingQr]);
 
   const handleCopyLink = useCallback(async () => {
+    if (!isProductActive) {
+      promptActivate();
+      return;
+    }
     if (!profileLink) {
       Alert.alert('No profile link', 'Sign in or set up your profile link first.');
       return;
@@ -82,7 +106,21 @@ export function ShareScreen() {
     } catch {
       Alert.alert('Copy failed', 'Could not copy the profile link. Please try again.');
     }
-  }, [profileLink]);
+  }, [isProductActive, profileLink, promptActivate]);
+
+  if (!isProductActive) {
+    return (
+      <ProductLockedView
+        title="Share your profile"
+        message="Activate your product to get your profile link, QR code, and sharing tools."
+        benefits={[
+          'Your unique profile URL',
+          'Downloadable QR code',
+          'Share via text, email, and signature',
+        ]}
+      />
+    );
+  }
 
   return (
     <ScrollView

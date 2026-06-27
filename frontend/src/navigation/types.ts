@@ -31,6 +31,7 @@ export type MenuStackParamList = {
   MenuMain: undefined;
   MenuDetail: { page: MenuDetailPage };
   ShareFeedback: undefined;
+  ActivateProduct: undefined;
 };
 
 export type MainTabParamList = {

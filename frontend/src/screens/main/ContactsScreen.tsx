@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchBar } from '../../components/ui/SearchBar';
+import { ProductLockedView } from '../../components/subscription/ProductLockedView';
 import { useAuth } from '../../context/AuthContext';
+import { useProductAccess } from '../../context/useProductAccess';
 import { ContactsStackParamList } from '../../navigation/types';
 import {
   CONTACTS_SYNC_INTERVAL_MS,
@@ -134,6 +136,7 @@ async function messageOnWhatsApp(mobile: string) {
 export function ContactsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { isProductActive } = useProductAccess();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all'>('all');
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -202,6 +205,20 @@ export function ContactsScreen({ navigation }: Props) {
       return haystack.includes(query);
     });
   }, [contacts, search]);
+
+  if (!isProductActive) {
+    return (
+      <ProductLockedView
+        title="Contacts"
+        message="Activate your product to collect and manage leads from your public profile."
+        benefits={[
+          'Leads from your profile page',
+          'Synced contact list in the app',
+          'Call and WhatsApp shortcuts',
+        ]}
+      />
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>

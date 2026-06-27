@@ -3,6 +3,7 @@ import {
   ensureProfileOnServer,
   syncProfileToServer,
 } from './profileApi';
+import { applySubscriptionFromServer } from './paymentApi';
 import { getProfileLinks } from './profileLinksStorage';
 import { saveUser } from './authStorage';
 import { filterCatalogLinks } from '../data/appsLinksCatalog';
@@ -34,6 +35,9 @@ export async function registerAndSyncUser(user: StoredUser): Promise<StoredUser>
   if (synced) {
     next = applyServerProfileToUser(next, synced);
   }
+
+  const subscriptionPatch = await applySubscriptionFromServer(next);
+  next = { ...next, ...subscriptionPatch };
 
   await saveUser(next);
   return next;

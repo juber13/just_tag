@@ -1,10 +1,13 @@
 import {
+  PROFILE_CONTACTS_SLUG,
+  PROFILE_OWNER_EMAIL,
   PROFILE_SERVER_URL,
   PROFILE_SYNC_ENABLED,
   profileMediaUrl,
   profilePublicUrl,
 } from '../config/profileServer';
 import { Contact } from '../types/contact';
+import { ProfileAnalytics, AnalyticsRange } from '../types/analytics';
 import { filterCatalogLinks } from '../data/appsLinksCatalog';
 import { PublicProfile, ProfilePayment, SavedProfileLink } from '../types/profile';
 import { StoredUser } from '../types/user';
@@ -297,6 +300,31 @@ function serverContactToContact(raw: ServerContactPayload): Contact {
   };
 }
 
+/** Same slug/owner the Contacts tab uses so analytics and contacts stay in sync. */
+export async function resolveProfileApiContext(
+  user: StoredUser | null,
+): Promise<{ slug: string; ownerEmail: string } | null> {
+  if (!PROFILE_SYNC_ENABLED) return null;
+
+  if (user?.email?.trim()) {
+    const slug = (await resolveProfileSlug(user)) ?? user.profileSlug?.trim();
+    if (slug) {
+      return {
+        slug,
+        ownerEmail: user.email.trim().toLowerCase(),
+      };
+    }
+  }
+
+  const configuredSlug = PROFILE_CONTACTS_SLUG.trim();
+  const configuredOwner = PROFILE_OWNER_EMAIL.trim().toLowerCase();
+  if (configuredSlug && configuredOwner) {
+    return { slug: configuredSlug, ownerEmail: configuredOwner };
+  }
+
+  return null;
+}
+
 export async function resolveProfileSlug(user: StoredUser): Promise<string | null> {
   const email = user.email.trim().toLowerCase();
   if (email && PROFILE_SYNC_ENABLED) {
@@ -338,5 +366,28 @@ export async function fetchProfileContacts(slug: string, ownerEmail: string): Pr
   } catch (error) {
     console.warn('[contacts] fetch error:', error);
     return [];
+  }
+}
+
+export async function fetchProfileAnalytics(
+  slug: string,
+  ownerEmail: string,
+  range: AnalyticsRange = '24h',
+): Promise<ProfileAnalytics | null> {
+  if (!PROFILE_SYNC_ENABLED || !slug.trim()) return null;
+  try {
+    const params = new URLSearchParams({ range });
+    const res = await fetch(
+      `${PROFILE_SERVER_URL}/api/profiles/${encodeURIComponent(slug)}/analytics?${params}`,
+      { headers: ownerHeaders(ownerEmail) },
+    );
+    if (!res.ok) {
+      console.warn(`[analytics] fetch failed (${res.status}) for slug=${slug}`);
+      return null;
+    }
+    return (await res.json()) as ProfileAnalytics;
+  } catch (error) {
+    console.warn('[analytics] fetch error:', error);
+    return null;
   }
 }

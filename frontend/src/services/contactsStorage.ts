@@ -1,11 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  CONTACTS_SYNC_INTERVAL_MS,
-  PROFILE_CONTACTS_SLUG,
-  PROFILE_OWNER_EMAIL,
-  PROFILE_SYNC_ENABLED,
-} from '../config/profileServer';
-import { fetchProfileContacts } from './profileApi';
+import { CONTACTS_SYNC_INTERVAL_MS, PROFILE_SYNC_ENABLED } from '../config/profileServer';
+import { fetchProfileContacts, resolveProfileApiContext } from './profileApi';
 import { Contact } from '../types/contact';
 
 const contactsKey = (ownerEmail: string) =>
@@ -18,8 +13,8 @@ type ContactsCacheMeta = {
   lastSyncedAt: string | null;
 };
 
-function profileOwnerEmail(): string {
-  return PROFILE_OWNER_EMAIL.trim().toLowerCase();
+async function profileSyncContext() {
+  return resolveProfileApiContext(null);
 }
 
 function sortContacts(contacts: Contact[]): Contact[] {
@@ -60,11 +55,15 @@ async function writeCacheMeta(ownerEmail: string, meta: ContactsCacheMeta): Prom
 let syncInFlight: Promise<Contact[]> | null = null;
 
 export async function getCachedContacts(): Promise<Contact[]> {
-  return sortContacts(await readContacts(profileOwnerEmail()));
+  const context = await profileSyncContext();
+  if (!context) return [];
+  return sortContacts(await readContacts(context.ownerEmail));
 }
 
 export async function getContactsCacheMeta(): Promise<ContactsCacheMeta> {
-  return readCacheMeta(profileOwnerEmail());
+  const context = await profileSyncContext();
+  if (!context) return { lastSyncedAt: null };
+  return readCacheMeta(context.ownerEmail);
 }
 
 export { CONTACTS_SYNC_INTERVAL_MS };
@@ -74,13 +73,14 @@ export async function syncContactsFromServer(): Promise<Contact[]> {
   if (syncInFlight) return syncInFlight;
 
   syncInFlight = (async () => {
-    const ownerEmail = profileOwnerEmail();
-    const profileSlug = PROFILE_CONTACTS_SLUG.trim();
-
     if (!PROFILE_SYNC_ENABLED) {
       return getCachedContacts();
     }
 
+    const context = await profileSyncContext();
+    if (!context) return getCachedContacts();
+
+    const { slug: profileSlug, ownerEmail } = context;
     const serverContacts = await fetchProfileContacts(profileSlug, ownerEmail);
     const localContacts = await readContacts(ownerEmail);
     const serverIds = new Set(serverContacts.map((c) => c.id));
@@ -107,7 +107,12 @@ export type LoadContactsResult = {
 export async function loadContactsWithCache(options?: {
   refresh?: boolean;
 }): Promise<LoadContactsResult> {
-  const ownerEmail = profileOwnerEmail();
+  const context = await profileSyncContext();
+  if (!context) {
+    return { contacts: [], fromCache: true, lastSyncedAt: null };
+  }
+
+  const { ownerEmail } = context;
   const meta = await readCacheMeta(ownerEmail);
   const cached = await getCachedContacts();
 

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useProductAccess } from '../../context/useProductAccess';
 import { colors, spacing, typography } from '../../theme';
 
 const TAB_CONFIG: {
@@ -19,6 +20,7 @@ const TAB_CONFIG: {
 
 export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { isProductActive } = useProductAccess();
 
   return (
     <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -26,6 +28,8 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
         const route = state.routes[index];
         const isFocused = state.index === index;
         const isCenter = tab.name === 'ShareTab';
+        const isLocked =
+          !isProductActive && (tab.name === 'ShareTab' || tab.name === 'AnalyticsTab' || tab.name === 'ContactsTab');
 
         const onPress = () => {
           const event = navigation.emit({
@@ -43,6 +47,11 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             <View key={tab.name} style={styles.centerWrap}>
               <Pressable style={styles.centerButton} onPress={onPress}>
                 <Ionicons name="qr-code" size={28} color={colors.white} />
+                {isLocked ? (
+                  <View style={styles.lockBadge}>
+                    <Ionicons name="lock-closed" size={10} color={colors.white} />
+                  </View>
+                ) : null}
               </Pressable>
             </View>
           );
@@ -50,11 +59,18 @@ export function CustomTabBar({ state, navigation }: BottomTabBarProps) {
 
         return (
           <Pressable key={tab.name} style={styles.tab} onPress={onPress}>
-            <Ionicons
-              name={isFocused ? tab.iconFocused : tab.icon}
-              size={24}
-              color={isFocused ? colors.black : colors.textSecondary}
-            />
+            <View style={styles.tabIconWrap}>
+              <Ionicons
+                name={isFocused ? tab.iconFocused : tab.icon}
+                size={24}
+                color={isFocused ? colors.black : colors.textSecondary}
+              />
+              {isLocked ? (
+                <View style={styles.tabLockBadge}>
+                  <Ionicons name="lock-closed" size={8} color={colors.white} />
+                </View>
+              ) : null}
+            </View>
             <Text style={[styles.label, isFocused && styles.labelActive]}>
               {tab.label}
             </Text>
@@ -107,5 +123,32 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primaryBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  tabIconWrap: {
+    position: 'relative',
+  },
+  tabLockBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.primaryBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
