@@ -2,7 +2,7 @@ export const PLANS = {
     annual: {
         id: 'annual',
         name: 'Justagg Annual',
-        amountPaise: 99900,
+        amountPaise: 100,
         currency: 'INR',
         durationDays: 365,
     },

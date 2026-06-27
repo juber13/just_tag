@@ -31,9 +31,9 @@ const PLAN_BENEFITS = [
 const FALLBACK_PLAN: PaymentPlan = {
   id: 'annual',
   name: 'Justagg Annual',
-  amountPaise: 99900,
+  amountPaise: 100,
   currency: 'INR',
-  priceLabel: '₹999 / year',
+  priceLabel: '₹1 / year',
 };
 
 export function ActivateProductScreen({ navigation }: Props) {
