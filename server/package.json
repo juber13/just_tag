@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "stop": "node scripts/stop-port.js",
-    "restart": "node scripts/stop-port.js && node server.js"
+    "restart": "node scripts/stop-port.js && node server.js",
+    "build:deploy": "node scripts/build-deploy.mjs"
   },
   "dependencies": {
     "cloudinary": "^2.10.0",
